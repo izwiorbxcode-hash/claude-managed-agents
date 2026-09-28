@@ -198,12 +198,21 @@ dist
 .dev.vars*
 !.dev.vars.example
 
-### Vite build output (frontend/) → public/ ###
-# Run `npm run build` before deploying to populate this directory.
+### Vite build output (apps/web/) → public/ ###
+# Run `bun run build:web` before deploying to populate this directory.
 public/
 
 ### Redoc standalone bundle (copied by scripts/copy-redoc.mjs at prebuild) ###
-frontend/static/redoc.standalone.js
+apps/web/static/redoc.standalone.js
+
+### Monorepo ###
+.turbo/
+apps/*/dist/
+apps/*/dist-client/
+apps/*/.wrangler/
+packages/*/dist/
+workers/*/dist/
+*.tsbuildinfo
 
 ### Superpowers ###
 .superpowers/

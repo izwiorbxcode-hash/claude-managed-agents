@@ -1,6 +1,23 @@
-# Claude Managed Agents on Cloudflare
+# IzwaAI — The Learned Data Layer for Specialized Intelligence
 
-Run Claude Managed Agents (CMA) on Cloudflare.
+> “We are not trying to build the biggest model. We are trying to make more of the world learnable.”
+> Canonical vision: [`docs/vision.md`](docs/vision.md).
+
+IzwaAI is a learned-data company whose first frontier is African language
+intelligence. This repo is a Bun + Turborepo monorepo (Unsung Stack template):
+
+- `apps/api` — Hono + Effect worker (canonical API, `apps/api/wrangler.jsonc`)
+- `apps/web` — web SPA · `apps/annotator` — human-in-the-loop · `apps/mobile` — Expo field app
+- `packages/domain/src/izwa` — refinery kernel (LDU pipeline)
+- `packages/taxonomy|datasets|evaluation|embeddings|annotation` — learned-data domain
+- `workers/` — Durable Objects, ingestion, workflows · `ml/` — Python/GPU research
+- `legacy/sandbox/` — archived Claude-managed-agents sandbox worker (do not extend)
+
+---
+
+# Claude Managed Agents on Cloudflare (legacy)
+
+Run Claude Managed Agents (CMA) on Cloudflare. **Archived under `legacy/sandbox/`.**
 
 This repo provides a customizable control plane that allows you to:
 - Run CMA sandboxes on both full containers and light-weight isolates

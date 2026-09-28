@@ -1,0 +1,10 @@
+{
+  "extends": "../../tooling/typescript/base.json",
+  "compilerOptions": {
+    "outDir": "dist",
+    "rootDir": "src",
+    "composite": true,
+    "types": ["node", "@cloudflare/workers-types"]
+  },
+  "include": ["src"]
+}

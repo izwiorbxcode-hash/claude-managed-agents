@@ -1,0 +1,20 @@
+{
+  "$schema": "https://biomejs.dev/schemas/2.5.3/schema.json",
+  "extends": [
+    "ultracite/biome/core",
+    "ultracite/biome/next",
+    "ultracite/biome/react"
+  ],
+  "overrides": [
+    {
+      "includes": ["apps/api/**", "packages/**"],
+      "linter": {
+        "rules": {
+          "correctness": {
+            "noUnusedImports": "warn"
+          }
+        }
+      }
+    }
+  ]
+}

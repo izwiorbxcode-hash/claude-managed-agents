@@ -27,3 +27,21 @@ BACKUP_BUCKET_NAME=<bucket-name-matching-r2_buckets[].bucket_name>
 
 # Optional — fallback inbox for stray (non-session) email arriving on the catch-all.
 # EMAIL_FORWARD=ops@example.com
+
+# IZWA open-chat LLM adapter. Defaults are tuned for FREE local testing:
+# with no LLM_* vars set, the chat loop talks to a local Ollama server.
+#   1. curl -fsSL https://ollama.com/install.sh | sh
+#   2. ollama pull llama3.2
+#   3. ollama serve
+# Then POST /api/chat/<id> and it just works, $0.
+#
+# To use any other OpenAI-compatible host instead:
+# LLM_PROVIDER=openai-compatible
+# LLM_BASE_URL=https://openrouter.ai/api/v1
+# LLM_API_KEY=<your-key>
+# LLM_MODEL=anthropic/claude-3.5-haiku
+#
+# Or Cloudflare Workers AI (OpenAI-compatible endpoint):
+# LLM_PROVIDER=workers-ai
+# LLM_MODEL=@cf/meta/llama-3.3-70b-instruct-fp8-fast
+# (uses CLOUDFLARE_ACCOUNT_ID + CLOUDFLARE_API_TOKEN above)

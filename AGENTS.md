@@ -9,15 +9,31 @@ STOP. Your knowledge of Cloudflare Workers APIs and limits may be outdated. Alwa
 
 For all limits and quotas, retrieve from the product's `/platform/limits/` page. eg. `/workers/platform/limits`
 
-## Commands
+## Monorepo (Bun + Turborepo, Unsung Stack template)
+
+Canonical vision: `docs/vision.md`. Stack docs: `docs/stack/`.
+Izwa domain: `packages/domain/src/izwa` · taxonomy/datasets/evaluation/embeddings/annotation in `packages/*`.
+API worker: `apps/api` (Hono + Effect, `apps/api/wrangler.jsonc` bindings). Web: `apps/web`.
+Legacy sandbox worker (`wrangler.jsonc`, `migrations/`, `tests/`, `Dockerfile`) is archived under `legacy/sandbox/` — do not extend it.
 
 | Command | Purpose |
 |---------|---------|
-| `npx wrangler dev` | Local development |
-| `npx wrangler deploy` | Deploy to Cloudflare |
-| `npx wrangler types` | Generate TypeScript types |
+| `bun install` | Install all workspaces |
+| `bun run dev` | Turbo: run all `dev` tasks |
+| `bun run dev:api` | API worker only (`wrangler dev`, apps/api) |
+| `bun run typecheck` | `turbo run check-types` across workspaces |
+| `bun run build` | `turbo run build` + web SPA to `./public` |
+| `bun run test` | `turbo run test` across workspaces |
+| `bunx wrangler dev --cwd apps/api` | Local API dev |
+| `bunx wrangler deploy --cwd apps/api` | Deploy API worker |
+| `bunx wrangler types --cwd apps/api` | Generate worker types |
 
-Run `wrangler types` after changing bindings in wrangler.jsonc.
+Run `wrangler types` after changing bindings in `apps/api/wrangler.jsonc`.
+D1 migrations live in `packages/db/src/migrations` (wired via `migrations_dir`).
+
+## Cloudflare Workers
+
+STOP. Your knowledge of Cloudflare Workers APIs and limits may be outdated. Always retrieve current documentation before any Workers, KV, R2, D1, Durable Objects, Queues, Vectorize, AI, or Agents SDK task.
 
 ## Node.js Compatibility
 

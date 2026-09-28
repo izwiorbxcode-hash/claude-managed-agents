@@ -1,0 +1,19 @@
+{
+  "name": "@izwa/datasets",
+  "version": "0.1.0",
+  "type": "module",
+  "main": "src/index.ts",
+  "types": "src/index.ts",
+  "scripts": {
+    "check-types": "tsc --noEmit",
+    "clean": "rm -rf dist",
+    "build": "tsc -b",
+    "test": "vitest run"
+  },
+  "dependencies": {
+    "effect": "catalog:"
+  },
+  "devDependencies": {
+    "typescript": "catalog:"
+  }
+}

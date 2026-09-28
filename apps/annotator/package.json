@@ -1,0 +1,18 @@
+{
+  "name": "@izwa/annotator",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "dev": "echo 'annotator Phase 3 placeholder — TanStack + virtualized review queues'",
+    "build": "echo build annotator",
+    "check-types": "tsc --noEmit"
+  },
+  "dependencies": {
+    "@izwa/annotation": "workspace:*",
+    "@izwa/taxonomy": "workspace:*"
+  },
+  "devDependencies": {
+    "typescript": "catalog:"
+  }
+}

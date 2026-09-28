@@ -1,0 +1,14 @@
+{
+  "name": "@unsung/infra",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "deploy": "echo 'infra deploy — Phase 8: wrangler + alchemy'",
+    "destroy": "echo destroy",
+    "check-types": "tsc --noEmit"
+  },
+  "devDependencies": {
+    "typescript": "catalog:"
+  }
+}

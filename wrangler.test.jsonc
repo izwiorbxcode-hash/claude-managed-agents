@@ -1,0 +1,51 @@
+{
+  // Test-only wrangler config for @cloudflare/vitest-pool-workers. A
+  // minimal subset of the real bindings so miniflare doesn't have to
+  // parse `containers` / `send_email` / `browser` (which it can't
+  // emulate). Vectorize, D1, R2 and the DO classes are emulated locally;
+  // `IZWA_MOCK` keeps every AI call off the wire.
+  "$schema": "node_modules/wrangler/config-schema.json",
+  "name": "izwa-test",
+  "main": "src/refinery/test-entry.ts",
+  "compatibility_date": "2026-05-18",
+  "compatibility_flags": ["nodejs_compat"],
+  "vars": {
+    "IZWA_MOCK": "1"
+  },
+  "d1_databases": [
+    {
+      "binding": "DB",
+      "database_name": "izwa-db",
+      "database_id": "00000000-0000-0000-0000-000000000000",
+      "migrations_dir": "./migrations"
+    }
+  ],
+  // NOTE: Vectorize cannot be emulated locally (no local dev support in
+  // miniflare), so it's intentionally omitted here. The retrieval layer
+  // degrades to "no matches" when the binding is absent, which the quality
+  // engine treats as neutral — the full pipeline still runs.
+  "r2_buckets": [
+    {
+      "binding": "IZWA_ASSETS",
+      "bucket_name": "izwa-assets"
+    }
+  ],
+  "durable_objects": {
+    "bindings": [
+      {
+        "class_name": "SwarmCoordinator",
+        "name": "SwarmCoordinator"
+      },
+      {
+        "class_name": "SpecialistAgent",
+        "name": "SpecialistAgent"
+      }
+    ]
+  },
+  "migrations": [
+    {
+      "tag": "v1",
+      "new_sqlite_classes": ["SwarmCoordinator", "SpecialistAgent"]
+    }
+  ]
+}

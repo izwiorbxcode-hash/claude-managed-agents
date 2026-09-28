@@ -1,0 +1,14 @@
+{
+  "name": "@unsung/admin",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "dev": "echo 'admin Phase 2 placeholder — Better Auth admin'",
+    "build": "echo build admin",
+    "check-types": "tsc --noEmit"
+  },
+  "devDependencies": {
+    "typescript": "catalog:"
+  }
+}

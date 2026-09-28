@@ -1,0 +1,63 @@
+{
+  "$schema": "node_modules/wrangler/config-schema.json",
+  "name": "izwa-api",
+  "main": "src/index.ts",
+  "compatibility_date": "2026-09-01",
+  "compatibility_flags": ["nodejs_compat"],
+  "observability": { "enabled": true },
+  "d1_databases": [
+    {
+      "binding": "DATABASE",
+      "database_name": "izwa-db",
+      "database_id": "00000000-0000-0000-0000-000000000000",
+      "migrations_dir": "../../packages/db/src/migrations",
+      "preview_database_id": "local"
+    }
+  ],
+  "r2_buckets": [
+    {
+      "binding": "IZWA_ASSETS",
+      "bucket_name": "izwa-assets"
+    }
+  ],
+  "vectorize": [
+    {
+      "binding": "IZWA_INDEX",
+      "index_name": "izwa-refinery"
+    }
+  ],
+  "ai": {
+    "binding": "AI"
+  },
+  "durable_objects": {
+    "bindings": [
+      {
+        "class_name": "SwarmCoordinator",
+        "name": "SwarmCoordinator"
+      },
+      {
+        "class_name": "SpecialistAgent",
+        "name": "SpecialistAgent"
+      },
+      {
+        "class_name": "AgentSession",
+        "name": "AgentSession"
+      }
+    ]
+  },
+  "migrations": [
+    {
+      "new_sqlite_classes": ["SwarmCoordinator", "SpecialistAgent"],
+      "tag": "v1"
+    },
+    {
+      "new_sqlite_classes": ["AgentSession"],
+      "tag": "v2"
+    }
+  ],
+  "vars": {
+    "BETTER_AUTH_SECRET": "dev-secret-change-me-in-production-32chars",
+    "BETTER_AUTH_URL": "http://localhost:8787",
+    "CORS_ORIGIN": "http://localhost:3000"
+  }
+}

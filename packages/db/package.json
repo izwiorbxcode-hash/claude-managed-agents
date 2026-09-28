@@ -1,0 +1,23 @@
+{
+  "name": "@unsung/db",
+  "version": "0.1.0",
+  "type": "module",
+  "main": "src/index.ts",
+  "scripts": {
+    "build": "tsc -b",
+    "check-types": "tsc --noEmit",
+    "db:generate": "drizzle-kit generate",
+    "db:migrate": "drizzle-kit migrate",
+    "clean": "rm -rf dist"
+  },
+  "dependencies": {
+    "@unsung/domain": "workspace:*",
+    "drizzle-orm": "catalog:",
+    "effect": "catalog:"
+  },
+  "devDependencies": {
+    "drizzle-kit": "catalog:",
+    "@cloudflare/workers-types": "catalog:",
+    "typescript": "catalog:"
+  }
+}

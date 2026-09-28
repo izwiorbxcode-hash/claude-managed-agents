@@ -1,0 +1,40 @@
+{
+  "extends": "../../tooling/typescript/base.json",
+  "compilerOptions": {
+    "outDir": "dist",
+    "rootDir": "src",
+    "composite": true,
+    "baseUrl": ".",
+    "ignoreDeprecations": "6.0",
+    "types": ["@cloudflare/workers-types"],
+    "noEmit": false,
+    "paths": {
+      "@unsung/domain": ["../../packages/domain/src/index.ts"],
+      "@unsung/domain/*": ["../../packages/domain/src/*"],
+      "@unsung/db": ["../../packages/db/src/index.ts"],
+      "@unsung/db/*": ["../../packages/db/src/*"],
+      "@unsung/validation": ["../../packages/validation/src/index.ts"],
+      "@unsung/validation/*": ["../../packages/validation/src/*"],
+      "@unsung/effect": ["../../packages/effect/src/index.ts"],
+      "@unsung/effect/*": ["../../packages/effect/src/*"],
+      "@unsung/config": ["../../packages/config/src/index.ts"],
+      "@izwa/taxonomy": ["../../packages/taxonomy/src/index.ts"],
+      "@izwa/datasets": ["../../packages/datasets/src/index.ts"],
+      "@izwa/evaluation": ["../../packages/evaluation/src/index.ts"],
+      "@izwa/embeddings": ["../../packages/embeddings/src/index.ts"],
+      "@izwa/annotation": ["../../packages/annotation/src/index.ts"]
+    }
+  },
+  "include": ["src"],
+  "references": [
+    { "path": "../../packages/domain" },
+    { "path": "../../packages/db" },
+    { "path": "../../packages/validation" },
+    { "path": "../../packages/effect" },
+    { "path": "../../packages/taxonomy" },
+    { "path": "../../packages/datasets" },
+    { "path": "../../packages/evaluation" },
+    { "path": "../../packages/embeddings" },
+    { "path": "../../packages/annotation" }
+  ]
+}

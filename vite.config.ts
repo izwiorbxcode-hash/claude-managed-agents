@@ -2,12 +2,14 @@ import { defineConfig } from "vite";
 import react from "@vitejs/plugin-react";
 import path from "node:path";
 
-// Vite builds the React/Kumo frontend into ./public, which is served by the
-// Worker via static assets. The /api/* and /webhooks paths are intercepted by
-// the Worker (see wrangler.jsonc → assets.run_worker_first).
+// Vite builds apps/web into ./public, served by the Worker via static
+// assets. The /api/* paths are intercepted by the Worker
+// (see apps/api/wrangler.jsonc → assets.run_worker_first).
+// TODO(phase-3): move to TanStack Start in apps/web with its own
+// vite.config; this root config is the legacy SPA bridge.
 export default defineConfig({
-  root: path.resolve(__dirname, "frontend"),
-  publicDir: path.resolve(__dirname, "frontend/static"),
+  root: path.resolve(__dirname, "apps/web"),
+  publicDir: path.resolve(__dirname, "apps/web/static"),
   build: {
     outDir: path.resolve(__dirname, "public"),
     emptyOutDir: true,
@@ -33,7 +35,7 @@ export default defineConfig({
   },
   resolve: {
     alias: {
-      "@": path.resolve(__dirname, "frontend/src"),
+      "@": path.resolve(__dirname, "apps/web/src"),
     },
   },
 });

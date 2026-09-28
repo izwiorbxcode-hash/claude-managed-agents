@@ -1,6 +1,6 @@
 {
   "$schema": "node_modules/wrangler/config-schema.json",
-  "name": "claude-managed-agents-control-plane",
+  "name": "izwa",
   "main": "src/index.ts",
   "compatibility_date": "2026-05-18",
   "compatibility_flags": ["nodejs_compat"],
@@ -72,9 +72,39 @@
   "d1_databases": [
     {
       "binding": "DB",
-      "database_name": "claude-managed-agents-db",
+      "database_name": "izwa-db",
       "database_id": "1f0a864c-282d-4108-abcc-9f2703d68448",
       "migrations_dir": "./migrations",
+    },
+  ],
+  // IZWA refinery vector space. The dialect/anchor + semantic memory index,
+  // queried by the ingestion worker to route raw input to the closest
+  // specialist clusters and upserted with human_anchor vectors on every
+  // expert resolution (self-healing). Dimensions must match the embedding
+  // model (768 for @cf/baai/bge-base-en-v1.5). Create it once with:
+  //   npx wrangler vectorize create izwa-refinery --dimensions=768 --metric=cosine
+  "vectorize": [
+    {
+      "binding": "IZWA_INDEX",
+      "index_name": "izwa-refinery",
+    },
+  ],
+  // IZWA immutable raw artifacts (audio, documents, images). Never
+  // overwritten — every asset keeps its id and the original bytes; a new
+  // upload creates a new asset row.
+  // BACKUP_BUCKET — sandbox snapshots. The Sandbox SDK reads BACKUP_BUCKET as
+  // an R2 binding (used directly in dev via `localBucket: true`); in
+  // production it presigns URLs against R2 — that path needs the secrets
+  // R2_ACCESS_KEY_ID, R2_SECRET_ACCESS_KEY, BACKUP_BUCKET_NAME, and
+  // CLOUDFLARE_ACCOUNT_ID. See README → Snapshots.
+  "r2_buckets": [
+    {
+      "binding": "IZWA_ASSETS",
+      "bucket_name": "izwa-assets",
+    },
+    {
+      "binding": "BACKUP_BUCKET",
+      "bucket_name": "claude-managed-agents-snapshots",
     },
   ],
   // Container DO — one sandbox per session, driven by webhooks.
@@ -103,6 +133,18 @@
       {
         "class_name": "IsolateRunner",
         "name": "IsolateRunner",
+      },
+      {
+        "class_name": "SwarmCoordinator",
+        "name": "SwarmCoordinator",
+      },
+      {
+        "class_name": "SpecialistAgent",
+        "name": "SpecialistAgent",
+      },
+      {
+        "class_name": "AgentSession",
+        "name": "AgentSession",
       },
     ],
   },
@@ -135,17 +177,6 @@
   "ai": {
     "binding": "AI",
   },
-  // R2 bucket for sandbox snapshots. The Sandbox SDK reads BACKUP_BUCKET as
-  // an R2 binding (used directly in dev via `localBucket: true`); in
-  // production it presigns URLs against R2 — that path needs the secrets
-  // R2_ACCESS_KEY_ID, R2_SECRET_ACCESS_KEY, BACKUP_BUCKET_NAME, and
-  // CLOUDFLARE_ACCOUNT_ID. See README → Snapshots.
-  "r2_buckets": [
-    {
-      "binding": "BACKUP_BUCKET",
-      "bucket_name": "claude-managed-agents-snapshots",
-    },
-  ],
   // Email Routing send_email binding for `email_send`. Configure
   // your zone in the dashboard (Email → Email Routing → Destination
   // addresses) and add the verified destinations to `destination_addresses`.
@@ -158,6 +189,14 @@
     {
       "new_sqlite_classes": ["Sandbox", "IsolateRunner"],
       "tag": "v1",
+    },
+    {
+      "new_sqlite_classes": ["SwarmCoordinator", "SpecialistAgent"],
+      "tag": "v2",
+    },
+    {
+      "new_sqlite_classes": ["AgentSession"],
+      "tag": "v3",
     },
   ],
   // Daily cleanup of webhook_events and sessions older than 24h.

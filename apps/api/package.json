@@ -1,0 +1,39 @@
+{
+  "name": "@unsung/api-worker",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "main": "src/index.ts",
+  "scripts": {
+    "dev": "wrangler dev --local --port 8787",
+    "deploy": "wrangler deploy",
+    "build": "tsc -b",
+    "check-types": "tsc --noEmit",
+    "test": "vitest run",
+    "db:generate": "drizzle-kit generate",
+    "clean": "rm -rf dist .wrangler"
+  },
+  "dependencies": {
+    "@unsung/db": "workspace:*",
+    "@unsung/domain": "workspace:*",
+    "@unsung/validation": "workspace:*",
+    "@unsung/effect": "workspace:*",
+    "@izwa/taxonomy": "workspace:*",
+    "@izwa/datasets": "workspace:*",
+    "@izwa/evaluation": "workspace:*",
+    "@izwa/embeddings": "workspace:*",
+    "@izwa/annotation": "workspace:*",
+    "effect": "catalog:",
+    "hono": "catalog:",
+    "drizzle-orm": "catalog:",
+    "zod": "catalog:"
+  },
+  "devDependencies": {
+    "@cloudflare/workers-types": "catalog:",
+    "@hono/zod-validator": "^0.7.4",
+    "drizzle-kit": "catalog:",
+    "typescript": "catalog:",
+    "wrangler": "catalog:",
+    "vitest": "catalog:"
+  }
+}

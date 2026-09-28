@@ -1,0 +1,14 @@
+{
+  "name": "@unsung/mobile",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "dev": "echo 'mobile Phase 3 placeholder — Expo + Hono RPC'",
+    "build": "echo build mobile",
+    "check-types": "tsc --noEmit"
+  },
+  "devDependencies": {
+    "typescript": "catalog:"
+  }
+}

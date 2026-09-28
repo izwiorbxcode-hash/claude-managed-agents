@@ -1,19 +1,39 @@
 {
   "compilerOptions": {
-    "target": "esnext",
-    "lib": ["esnext"],
-    "module": "esnext",
+    "target": "ES2022",
+    "module": "ESNext",
     "moduleResolution": "bundler",
-    "types": [
-        "./worker-configuration.d.ts",
-        "@types/node",
-        "node"
-    ],
-    "esModuleInterop": true,
-    "forceConsistentCasingInFileNames": true,
     "strict": true,
+    "esModuleInterop": true,
     "skipLibCheck": true,
-    "noEmit": true
+    "forceConsistentCasingInFileNames": true,
+    "declaration": true,
+    "declarationMap": true,
+    "sourceMap": true,
+    "resolveJsonModule": true,
+    "isolatedModules": true,
+    "noEmit": true,
+    "types": ["node"],
+    "paths": {
+      "@unsung/domain": ["./packages/domain/src"],
+      "@unsung/domain/*": ["./packages/domain/src/*"],
+      "@unsung/db": ["./packages/db/src"],
+      "@unsung/db/*": ["./packages/db/src/*"],
+      "@unsung/api": ["./packages/api/src"],
+      "@unsung/api/*": ["./packages/api/src/*"],
+      "@unsung/effect": ["./packages/effect/src"],
+      "@unsung/effect/*": ["./packages/effect/src/*"],
+      "@unsung/validation": ["./packages/validation/src"],
+      "@unsung/config": ["./packages/config/src"],
+      "@unsung/auth": ["./packages/auth/src"],
+      "@unsung/storage": ["./packages/storage/src"],
+      "@izwa/taxonomy": ["./packages/taxonomy/src"],
+      "@izwa/datasets": ["./packages/datasets/src"],
+      "@izwa/evaluation": ["./packages/evaluation/src"],
+      "@izwa/embeddings": ["./packages/embeddings/src"],
+      "@izwa/annotation": ["./packages/annotation/src"]
+    }
   },
-  "include": ["worker-configuration.d.ts", "src/**/*.ts"]
+  "include": ["apps/*/src/**/*.ts", "packages/*/src/**/*.ts", "workers/**/*.ts"],
+  "exclude": ["node_modules", "dist", ".wrangler", "apps/*/dist", "legacy/**", "public/**"]
 }

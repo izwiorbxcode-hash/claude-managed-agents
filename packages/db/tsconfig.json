@@ -1,0 +1,16 @@
+{
+  "extends": "../../tooling/typescript/base.json",
+  "compilerOptions": {
+    "outDir": "dist",
+    "rootDir": "src",
+    "composite": true,
+    "baseUrl": ".",
+    "ignoreDeprecations": "6.0",
+    "paths": {
+      "@unsung/domain": ["../domain/src/index.ts"],
+      "@unsung/domain/*": ["../domain/src/*"]
+    }
+  },
+  "include": ["src"],
+  "references": [{ "path": "../domain" }]
+}
