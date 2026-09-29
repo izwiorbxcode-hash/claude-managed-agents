@@ -3,7 +3,8 @@
 // in the vector space. Without anchors the router would scout an empty
 // index on first ingest.
 
-import { LANGUAGE_CONTRACT } from "./contracts";
+import { IDIOM_CONTEXT_CONTRACT, LANGUAGE_CONTRACT } from "./contracts";
+import { CONTEXTUAL_MEANING_CONTRACT, SERVICE_CONVERSATION_CONTRACT, VOCABULARY_DEVELOPMENT_CONTRACT } from "./context-contracts";
 import { mockEmbedding } from "./embed";
 import { ANCHOR_KIND, upsertAnchors, type AnchorVector } from "./retrieval";
 import { saveContract, upsertExpert, type ExpertRow } from "./store";
@@ -17,7 +18,8 @@ const ANCHOR_SEEDS: Record<string, string> = {
 };
 
 export async function seedRefinery(env: Env): Promise<{ contracts: number; experts: number; anchors: string[] }> {
-  await saveContract(env.DB, LANGUAGE_CONTRACT);
+  const contracts = [LANGUAGE_CONTRACT, IDIOM_CONTEXT_CONTRACT, CONTEXTUAL_MEANING_CONTRACT, SERVICE_CONVERSATION_CONTRACT, VOCABULARY_DEVELOPMENT_CONTRACT];
+  for (const contract of contracts) await saveContract(env.DB, contract);
 
   const experts: ExpertRow[] = [
     {
@@ -61,5 +63,5 @@ export async function seedRefinery(env: Env): Promise<{ contracts: number; exper
   }));
   await upsertAnchors(env, anchors);
 
-  return { contracts: 1, experts: experts.length, anchors: anchors.map((a) => a.id) };
+  return { contracts: contracts.length, experts: experts.length, anchors: anchors.map((a) => a.id) };
 }

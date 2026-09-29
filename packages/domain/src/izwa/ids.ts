@@ -13,6 +13,12 @@ export const PREFIXES = [
   "mem_",
   "prov_",
   "ver_",
+  "segment_",
+  "review_",
+  "verify_",
+  "edge_",
+  "dataset_",
+  "dataset_version_",
 ] as const;
 
 export type IzwaIdPrefix = (typeof PREFIXES)[number];
@@ -33,6 +39,12 @@ const REGEX: Record<IzwaIdPrefix, RegExp> = {
   mem_: /^mem_[^/]+$/,
   prov_: /^prov_[^/]+$/,
   ver_: /^ver_[^/]+$/,
+  segment_: /^segment_[^/]+$/,
+  review_: /^review_[^/]+$/,
+  verify_: /^verify_[^/]+$/,
+  edge_: /^edge_[^/]+$/,
+  dataset_: /^dataset_[^/]+$/,
+  dataset_version_: /^dataset_version_[^/]+$/,
 };
 
 export function isIzwaId(id: unknown, prefix: IzwaIdPrefix): id is string {

@@ -27,6 +27,7 @@ export const PATHS = {
   secrets: "/secrets",
   vpc: "/vpc",
   doc: "/docs/:slug",
+  idiomReview: "/idiom-review",
 } as const;
 
 // Path of the standalone Redoc API reference page. Served as a real
@@ -90,6 +91,7 @@ export type NavId =
   | "egress"
   | "secrets"
   | "vpc"
+  | "idiom-review"
   | `doc:${string}`
   | "api-docs";
 
@@ -114,6 +116,7 @@ export function navIdForPath(pathname: string): NavId | null {
   if (pathname === PATHS.egress) return "egress";
   if (pathname === PATHS.secrets) return "secrets";
   if (pathname === PATHS.vpc) return "vpc";
+  if (pathname === PATHS.idiomReview) return "idiom-review";
   if (pathname.startsWith("/docs/")) {
     const slug = decodeURIComponent(pathname.slice("/docs/".length));
     return `doc:${slug}` as NavId;
@@ -140,6 +143,8 @@ export function pathForNav(id: NavId): string {
       return PATHS.secrets;
     case "vpc":
       return PATHS.vpc;
+    case "idiom-review":
+      return PATHS.idiomReview;
     case "api-docs":
       return API_REFERENCE_URL;
     default:

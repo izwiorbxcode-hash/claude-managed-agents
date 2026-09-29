@@ -45,3 +45,8 @@ BACKUP_BUCKET_NAME=<bucket-name-matching-r2_buckets[].bucket_name>
 # LLM_PROVIDER=workers-ai
 # LLM_MODEL=@cf/meta/llama-3.3-70b-instruct-fp8-fast
 # (uses CLOUDFLARE_ACCOUNT_ID + CLOUDFLARE_API_TOKEN above)
+
+# Izwa reviewer credentials. Generate a strong value and keep it server-side.
+# REVIEW_AUTH_SECRET=<at-least-32-random-bytes>
+# Set only for local development if unsigned x-user-id/x-reviewer-role headers are needed.
+# IZWA_DEV_AUTH=false

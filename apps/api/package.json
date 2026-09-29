@@ -10,6 +10,7 @@
     "build": "tsc -b",
     "check-types": "tsc --noEmit",
     "test": "vitest run",
+    "review:token": "node scripts/create-review-token.mjs",
     "db:generate": "drizzle-kit generate",
     "clean": "rm -rf dist .wrangler"
   },

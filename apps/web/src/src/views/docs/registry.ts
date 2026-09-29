@@ -27,6 +27,7 @@ import {
 } from "@phosphor-icons/react";
 
 import productGuide from "../../../../../../docs/product-guide.md?raw";
+import missionCommerce from "../../../../../../docs/mission-commerce.md?raw";
 import systemMap from "../../../../../../docs/system-map.md?raw";
 import developerGuide from "../../../../../../docs/developer-guide.md?raw";
 import deployment from "../../../../../../docs/web-deployment.md?raw";
@@ -56,6 +57,14 @@ export interface DocPage {
 }
 
 export const DOCS: DocPage[] = [
+  {
+    slug: "mission-commerce",
+    title: "Mission & Commerce",
+    sidebarTitle: "Mission & Commerce",
+    description: "Public access through language, contextual data products, vocabulary development, and the commercial delivery model.",
+    icon: MapTrifold,
+    content: missionCommerce,
+  },
   {
     slug: "product-guide",
     title: "IzwaAI Product Guide",

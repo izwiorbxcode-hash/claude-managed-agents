@@ -39,6 +39,16 @@ The API listens on `http://localhost:8787`; Vite listens on `http://localhost:51
 
 Run `bunx wrangler types --cwd apps/api` after changing bindings in `apps/api/wrangler.jsonc`.
 
+## Idiom production path
+
+1. Upload consented `audio/*` bytes to `PUT /api/izwa/media/:key` with `x-izwa-consent`.
+2. Call `POST /api/izwa/media/:assetId/transcribe` for timestamped Workers AI transcription.
+3. Mark the expression and context with `POST /api/izwa/idioms/tasks`.
+4. Complete speaker and independent fluent reviews at `/idiom-review`.
+5. Create a dataset, then publish an immutable version using one of the supported product projections.
+
+Reviewer identity currently comes from `x-user-id` while the Better Auth integration remains a scaffold. Do not expose mutation routes publicly until authenticated sessions and role checks replace this development identity seam.
+
 ## Adding a feature
 
 1. Put business rules and schemas in `packages/domain` or the relevant `@izwa/*` package.
@@ -56,4 +66,3 @@ Markdown source lives in `docs/`. To show a page inside the web app, import it a
 ## Known transition
 
 This repository evolved from a Cloudflare Claude Managed Agents template. The maintained system lives under `apps/`, `packages/`, and `workers/`; the old implementation is archived at `legacy/sandbox/`. Do not add new product behavior to root legacy files.
-

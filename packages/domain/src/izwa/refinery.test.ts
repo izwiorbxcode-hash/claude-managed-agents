@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { LANGUAGE_CONTRACT, validatePayload } from "./contracts";
+import { IDIOM_CONTEXT_CONTRACT, LANGUAGE_CONTRACT, validateIdiomApprovals, validateIdiomPayload, validatePayload } from "./contracts";
 import { contentHash, isIzwaId, newId } from "./ids";
 import { parseJsonObject } from "./models";
 import { profileInput } from "./profile";
@@ -82,6 +82,42 @@ describe("izwa contracts", () => {
     });
     expect(bad.violations.some((v) => v.includes("language"))).toBe(true);
     expect(bad.score).toBeLessThan(1);
+  });
+});
+
+describe("idiom context contract", () => {
+  const payload = {
+    expression_span: { text: "inkunzi isematholeni", start_ms: 1200, end_ms: 2800 },
+    context: "An elder encourages young people during a community meeting.",
+    literal_meaning: "The bull is among the calves.",
+    meaning_in_source_language: "Ikusasa lesizwe lisentsheni.",
+    speaker_intent: { value: "encouragement", basis: "speaker_attested" },
+    social_function: ["advice", "encouragement"],
+    usage_conditions: "Used to emphasize the future role of younger people.",
+    alternative_readings: [],
+    translations: [{ targetLanguage: "English", text: "The future lies with the youth.", register: "neutral" }],
+    review_evidence: [],
+    source_asset_id: "asset_1",
+    source_group_id: "source_1",
+    transcript: "inkunzi isematholeni",
+  };
+
+  it("validates the cultural meaning payload, not only linguistic structure", () => {
+    expect(validatePayload(IDIOM_CONTEXT_CONTRACT, payload).violations).toEqual([]);
+    expect(validateIdiomPayload(payload)).toEqual([]);
+    expect(validateIdiomPayload({ ...payload, speaker_intent: { value: "guess" } })).toContain(
+      "speaker_intent requires value and an explicit basis",
+    );
+  });
+
+  it("requires two distinct humans to approve every trust-critical field", () => {
+    const fields = ["expression_span", "context", "meaning_in_source_language", "speaker_intent", "usage_conditions", "translations"];
+    const reviews = fields.flatMap((field) => [
+      { field, reviewerId: "speaker-1", reviewerRole: "speaker" as const, verdict: "verified" as const, basis: "speaker_attested" as const, evidenceIds: ["asset_1"], reviewedAtMs: 1 },
+      { field, reviewerId: "reviewer-2", reviewerRole: "fluent_reviewer" as const, verdict: "verified" as const, basis: "reviewer_attested" as const, evidenceIds: ["asset_1"], reviewedAtMs: 2 },
+    ]);
+    expect(validateIdiomApprovals(reviews).approved).toBe(true);
+    expect(validateIdiomApprovals(reviews.filter((review) => review.field !== "translations")).missing).toContain("translations");
   });
 });
 

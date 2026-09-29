@@ -7,7 +7,8 @@
   "scripts": {
     "build": "tsc -b",
     "check-types": "tsc --noEmit",
-    "test": "vitest run",
+    "test": "vitest run --exclude src/izwa/integration.test.ts",
+    "test:integration": "vitest run --config ../../vitest.workers.config.ts src/izwa/integration.test.ts",
     "clean": "rm -rf dist"
   },
   "dependencies": {

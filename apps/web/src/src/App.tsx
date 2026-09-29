@@ -9,6 +9,7 @@ import {
   ArrowSquareOut,
   BookOpen,
   List as ListIcon,
+  Translate,
 } from "@phosphor-icons/react";
 import {
   BrowserRouter,
@@ -47,6 +48,7 @@ import { EgressView } from "./views/EgressView";
 import { SecretsView } from "./views/SecretsView";
 import { VpcView } from "./views/VpcView";
 import { DocView } from "./views/DocView";
+import { IdiomReviewView } from "./views/IdiomReviewView";
 import { DOCS } from "./views/docs/registry";
 import { ToastProvider } from "./toasts";
 
@@ -82,6 +84,10 @@ type NavGroup = {
 
 const NAV_GROUPS: NavGroup[] = [
   {
+    label: "Izwa Refinery",
+    items: [{ id: "idiom-review", label: "Idiom Review", icon: Translate }],
+  },
+  {
     label: "Cloudflare",
     items: [
       { id: "environments", label: "Sandboxes", icon: ContainersIcon },
@@ -108,7 +114,7 @@ const NAV_GROUPS: NavGroup[] = [
     collapsible: true,
     defaultOpen: false,
     items: [
-      ...docNavItems(["product-guide", "system-map", "developer-guide", "web-deployment"]),
+      ...docNavItems(["mission-commerce", "product-guide", "system-map", "developer-guide", "web-deployment"]),
       ...DOCS.filter(
         (d) => d.slug !== "about" && d.slug !== "architecture",
       ).map((d) => ({
@@ -341,9 +347,9 @@ function NavGroupSection({
   }
 
   return (
-    <Sidebar.Group collapsible open={open} onOpenChange={setUserOpen}>
-      <Sidebar.GroupLabel>{group.label}</Sidebar.GroupLabel>
-      <Sidebar.GroupContent>{menu}</Sidebar.GroupContent>
+    <Sidebar.Group>
+      <Sidebar.GroupLabel onClick={() => setUserOpen((value) => !value)}>{group.label}</Sidebar.GroupLabel>
+      {open ? menu : null}
     </Sidebar.Group>
   );
 }
@@ -496,6 +502,7 @@ function AppRoutes() {
       <Route path={PATHS.secrets} element={<SecretsView />} />
       <Route path={PATHS.vpc} element={<VpcView />} />
       <Route path={PATHS.doc} element={<DocRoute />} />
+      <Route path={PATHS.idiomReview} element={<IdiomReviewView />} />
       {/* The API Reference (/redoc.html) is served as a static asset
           and reached via a top-level browser navigation from the
           sidebar — it's not a SPA route. */}

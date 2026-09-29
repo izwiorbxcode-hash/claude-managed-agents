@@ -2,7 +2,7 @@
 
 This document follows one audio or video contribution from upload, through automated analysis and human-in-the-loop (HITL) review, to a versioned learned-dataset export. It describes the refinery implemented in `packages/domain/src/izwa` and the reference orchestration in `workers/refinery`.
 
-> **Current implementation boundary:** the canonical API Worker in `apps/api` currently exposes only the Izwa health, quality-contract, and language-taxonomy routes. The complete ingest, negotiation, HITL, and export API exists in `workers/refinery/api.ts`, but is not yet mounted into `apps/api`. Media transcription, video demux, consent enforcement, and signed upload/download URLs are also still required. The intended production workflow below calls out those seams.
+> **Current implementation boundary:** the canonical API Worker in `apps/api` now mounts the consent-gated media, Workers AI transcription, idiom task, blind field-review, evaluation-partition, and immutable dataset-version routes. The reviewer UI is available at `/idiom-review`. Video demux, resumable/signed uploads, long-media orchestration, and full account authentication remain deployment boundaries.
 
 ## Outcome
 
@@ -19,6 +19,34 @@ raw media
 
 many learned data records + a versioned contract = learned dataset export
 ```
+
+## Cultural meaning is a first-class output
+
+Linguistic structure is not enough for culturally situated expressions. The refinery therefore has a separate `idiom-context-v1` contract. It can link to a detailed `language-v1` record, but it does not require full phonetic and syntactic analysis before meaning can be reviewed.
+
+| Field | Required evidence |
+|---|---|
+| `expression_span` | Exact words plus start/end milliseconds |
+| `context` | Surrounding conversation and real-world situation |
+| `literal_meaning` | What the words describe literally |
+| `meaning_in_source_language` | Natural explanation in the original language |
+| `speaker_intent` | Value plus `speaker_attested`, `inferred`, or `unknown` basis |
+| `social_function` | Advice, criticism, teasing, warning, refusal, etc. |
+| `usage_conditions` | When the expression is appropriate |
+| `alternative_readings` | Other readings and their supporting context |
+| `translations` | Target-language renderings with register |
+| `known_bad_translation` | Observed or constructed failure, explicitly labelled |
+| `failure_explanation` | What the bad translation loses or gets wrong |
+| `review_evidence` | Field, reviewer, role, verdict, basis, evidence IDs, and time |
+
+For trust-critical fields, approval requires both a speaker and a different fluent reviewer (or adjudicator). `human_verified` is derived from those field approvals; editing one field never implies that every other field was checked.
+
+Model agreement is only a routing signal. It is not correctness evidence, and the `0.78` machine threshold is an operational value until calibrated against reviewed data. Idiom releases require human verification even when machines agree. Machine-only records remain a separately labelled tier.
+
+Machine precedents and human anchors have distinct trust tiers and retain a root source ID. Several derivatives of one source cannot masquerade as independent evidence. Likewise, evaluations are partitioned into:
+
+- `retrieval_regression`: corrections may become reusable anchors and test known-knowledge reuse;
+- `held_out`: answers are ineligible for retrieval and training and test generalization.
 
 ## End-to-end flow
 
@@ -64,12 +92,13 @@ The client should validate type, size, duration, and required consent before upl
 
 ### Current API shape
 
-The reference API accepts:
+The canonical idiom API accepts:
 
-1. `PUT /api/izwa/assets/raw/:key` for raw bytes, currently capped at 32 MB; then
-2. `POST /api/izwa/ingest` with an `audioKey`, or with inline `audioBase64` up to 8 MB.
+1. `PUT /api/izwa/media/:key` for consented `audio/*` or `video/*` bytes;
+2. `POST /api/izwa/media/:assetId/transcribe` for audio transcription and WebVTT captions;
+3. `POST /api/izwa/idioms/tasks` to mark an expression and open mandatory review.
 
-`POST /ingest` also accepts `text`, `audioDurationSec`, `source`, `tenant`, `modality`, `meta`, and `async`.
+The general reference refinery endpoints remain in `workers/refinery/api.ts` while they are progressively folded into the canonical Hono API.
 
 ### Persisted artifacts
 
@@ -81,7 +110,7 @@ The content hash gives the system a stable deduplication signal. The source byte
 
 ### Required media-processing seam
 
-The current code does **not** transcribe audio, extract audio from video, identify speakers, or segment long recordings. Before profiling, production needs a media-preparation stage:
+The canonical API transcribes short audio with Workers AI Whisper and stores text plus WebVTT. It does **not** yet extract audio from video, identify speakers, or split long recordings. Production still needs this media-preparation stage:
 
 ```text
 video → demux audio → normalize codec/sample rate
@@ -89,7 +118,7 @@ audio → voice activity detection → segments → speech-to-text
                                   ↘ timestamps / speaker labels / confidence
 ```
 
-Its transcript and time-aligned segments should become derived assets linked to the original source. Without a supplied transcript, the current specialists receive an empty text string, so audio-only input cannot yet yield a meaningful language record.
+Its transcript and time-aligned segments should become derived assets linked to the original source. Short audio can use the implemented transcription endpoint; video must first be demuxed into a linked audio asset.
 
 ## 2. Deterministic profiling
 
@@ -178,6 +207,8 @@ When the contract threshold and every hard gate pass:
 
 “Auto” means contract-verified by the automated gates, not human-verified.
 
+For `idiom-context-v1`, this branch creates at most a machine-tier candidate. It cannot enter a human-verified idiom release until the mandatory two-person, field-level review is complete. Other contracts may also send deterministic samples of passing records to review so the system can discover confident shared model errors.
+
 ## 6B. Human-in-the-loop escalation
 
 When the score is too low or a hard gate fails, the system does not discard the work and does not silently accept it.
@@ -258,6 +289,8 @@ Each JSONL row follows the language contract and includes:
 
 The manifest contains the export ID, format, contract ID/version, tenant, record count, field list, and creation time. Exported D1 records are marked `exported`.
 
+The idiom exporter can project the same approved record into `speech-transcription`, `idiom-detection`, `contextual-interpretation`, `translation`, `translation-correction`, `contrastive`, or `full` products. All derivatives preserve their common `source_group_id` and are assigned to the same train/validation/test split, preventing source leakage.
+
 ### Production versioning requirement
 
 The current exporter materializes a batch, but a production learned dataset should also have a durable dataset/version entity with:
@@ -300,21 +333,35 @@ stateDiagram-v2
 | Task negotiation state | Durable Object | Single-owner orchestration |
 | Embeddings/specialist inference | Workers AI or configured provider | Machine representations and proposals |
 
-## Production gaps to close
+## Remaining production boundaries
 
-The workflow is architecturally coherent, but these items must be implemented before claiming complete media-to-dataset operation:
+The narrow, fully reviewed audio-to-idiom-export path is implemented. These deployment-grade capabilities remain before the platform should accept unrestricted public production traffic:
 
-1. Mount the full refinery routes and Durable Object classes into `apps/api` (or deploy them as a separately bound Worker).
-2. Add direct, resumable R2 uploads and real MIME preservation instead of treating every upload as WAV.
-3. Add video demux, audio normalization, speech-to-text, timestamps, diarization, and long-media segmentation.
-4. Define segment-level assets/tasks so one long recording does not become one oversized record.
-5. Enforce authentication, tenant isolation, roles, consent, licenses, retention, PII redaction, and deletion propagation.
-6. Build the annotator UI for claim/review/reject/resolve and expert conflict adjudication.
-7. Validate expert corrections against the contract before crystallization; the current resolve path calculates quality but still writes the human-corrected record.
-8. Add immutable dataset/version tables, split generation, data cards, revocations, and signed export access.
-9. Add queues/workflows, idempotency, retries, dead-letter handling, and observability for long-running media jobs.
-10. Calibrate quality weights and thresholds against labeled, human-reviewed evaluation data.
+1. Replace the interim signed reviewer credentials with Better Auth sessions, managed tenant membership, reviewer qualifications, and authorization for every contributor and administrative route.
+2. Add direct resumable/signed R2 uploads, quotas, malware/media validation, and upload finalization rather than proxying large bodies through one request.
+3. Add video demux, audio normalization, diarization, voice-activity segmentation, and queued/workflow-based processing for long media.
+4. Add reviewer assignment locks, deadlines, notifications, and a dedicated adjudication comparison view; conflicting values already stop crystallization and route to adjudication.
+5. Add consent withdrawal, retention enforcement, PII redaction, record revocation, and deletion propagation into published versions.
+6. Add signed dataset downloads, richer data cards, quality/coverage distributions, parent-version changelogs, and revocation manifests.
+7. Add idempotency keys, queue retries, dead-letter handling, and end-to-end operational telemetry.
+8. Calibrate machine routing thresholds against labeled human-reviewed data; they must never be presented as probabilities of cultural correctness.
 
 ## One-sentence mental model
 
 IzwaAI preserves the user's media as evidence, asks independent specialists to propose structured interpretations, uses a versioned quality contract to decide what can be trusted, sends uncertainty to the right human, turns that correction into both a verified record and future learning, and exports only crystallized records as an auditable learned dataset.
+
+The broader contextual-language, public-service, vocabulary-development, and commercial model is specified in [`docs/mission-commerce.md`](docs/mission-commerce.md).
+## Reviewer access
+
+Review queues and submissions require a tenant-scoped, expiring reviewer token.
+Set `REVIEW_AUTH_SECRET` as a Worker secret, then create a token locally:
+
+```sh
+cd apps/api
+REVIEW_AUTH_SECRET='your-local-secret' bun run review:token reviewer_01 speaker default 8
+```
+
+Paste the generated credential into the reviewer screen. It is kept in browser
+session storage and removed when the browser session ends. `IZWA_DEV_AUTH=true`
+enables header-based identities for local automation only and must not be set in
+production.

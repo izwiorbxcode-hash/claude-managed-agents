@@ -2,6 +2,7 @@
 
 > “We are not trying to build the biggest model. We are trying to make more of the world learnable.”
 > Canonical vision: [`docs/vision.md`](docs/vision.md).
+> Product and commercial mission: [`docs/mission-commerce.md`](docs/mission-commerce.md).
 
 IzwaAI is a learned-data company whose first frontier is African language
 intelligence. This repo is a Bun + Turborepo monorepo (Unsung Stack template):

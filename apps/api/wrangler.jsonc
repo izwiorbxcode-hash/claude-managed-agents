@@ -29,32 +29,6 @@
   "ai": {
     "binding": "AI"
   },
-  "durable_objects": {
-    "bindings": [
-      {
-        "class_name": "SwarmCoordinator",
-        "name": "SwarmCoordinator"
-      },
-      {
-        "class_name": "SpecialistAgent",
-        "name": "SpecialistAgent"
-      },
-      {
-        "class_name": "AgentSession",
-        "name": "AgentSession"
-      }
-    ]
-  },
-  "migrations": [
-    {
-      "new_sqlite_classes": ["SwarmCoordinator", "SpecialistAgent"],
-      "tag": "v1"
-    },
-    {
-      "new_sqlite_classes": ["AgentSession"],
-      "tag": "v2"
-    }
-  ],
   "vars": {
     "BETTER_AUTH_SECRET": "dev-secret-change-me-in-production-32chars",
     "BETTER_AUTH_URL": "http://localhost:8787",

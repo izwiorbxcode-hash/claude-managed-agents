@@ -10,7 +10,12 @@ export type Modality =
   | "video"
   | "structured";
 
-export type Vertical = "language" | "idiom-context";
+export type Vertical =
+  | "language"
+  | "idiom-context"
+  | "contextual-meaning"
+  | "service-conversation"
+  | "vocabulary-development";
 
 export type SpecialistRole =
   | "phonetics"
@@ -34,23 +39,23 @@ export type TaskStatus =
 // Layer 2 output: everything the system can learn about an input *before*
 // spending money on frontier models.
 export interface AssetProfile {
-  modality: Modality;
-  languageHints: string[];
-  scriptHints: string[];
-  privacy: "public" | "sensitive";
   complexity: "low" | "medium" | "high";
   duplicateOf: string | null;
-  qualityIndicators: Record<string, number | boolean | string>;
-  textLength: number;
   estimatedDurationSec?: number;
+  languageHints: string[];
+  modality: Modality;
+  privacy: "public" | "sensitive";
+  qualityIndicators: Record<string, number | boolean | string>;
+  scriptHints: string[];
+  textLength: number;
 }
 
 // A vector-space hit returned by Vectorize. Used both for dialect
 // scouting (routing) and evidence retrieval (context for specialists).
 export interface VecMatch {
   id: string;
-  score: number;
   metadata?: Record<string, unknown>;
+  score: number;
 }
 
 // One specialist seat on the composed team. Independence is tracked
@@ -58,10 +63,7 @@ export interface VecMatch {
 // prompt are NOT three independent opinions, so each assignment declares
 // exactly which dimensions differ.
 export interface SpecialistAssignment {
-  role: SpecialistRole;
   agentKey: string;
-  promptVersion: string;
-  modelId: string;
   independence: {
     model: string;
     prompt: string;
@@ -69,43 +71,46 @@ export interface SpecialistAssignment {
     representations: string[];
     evidenceIds: string[];
   };
+  modelId: string;
+  promptVersion: string;
+  role: SpecialistRole;
 }
 
 export interface SpecialistTeam {
-  vertical: Vertical;
+  anchors: VecMatch[];
   assignments: SpecialistAssignment[];
   retrievedEvidence: VecMatch[];
-  anchors: VecMatch[];
+  vertical: Vertical;
 }
 
 // A single specialist's proposed result. `confidence` is advisory only —
 // it feeds the composite quality engine, it is never treated as
 // authoritative.
 export interface Proposal {
-  proposalId: string;
-  taskId: string;
-  specialistRole: SpecialistRole;
   agentKey: string;
-  modelId: string;
-  promptVersion: string;
   confidence: number;
-  uncertainty: string[];
-  payload: Record<string, unknown>;
   evidenceIds: string[];
+  modelId: string;
+  payload: Record<string, unknown>;
+  promptVersion: string;
+  proposalId: string;
+  specialistRole: SpecialistRole;
+  taskId: string;
+  uncertainty: string[];
 }
 
 export interface QualityComponent {
+  detail: unknown;
   name: string;
   score: number; // 0..1
   weight: number; // 0..1
-  detail: unknown;
 }
 
 export interface CompositeQuality {
-  overall: number; // weighted mean of components, 0..1
   components: QualityComponent[];
-  threshold: number;
+  overall: number; // weighted mean of components, 0..1
   satisfied: boolean;
+  threshold: number;
   unsatisfiedGates: string[];
 }
 
@@ -114,80 +119,93 @@ export interface CompositeQuality {
 // satisfied.
 export interface QualityContract {
   contractId: string;
-  name: string;
-  vertical: Vertical;
-  version: string;
-  threshold: number;
-  minComponents: { name: string; min: number }[];
-  weights: Record<string, number>;
-  schema: Record<string, { required?: boolean; type: string; description?: string }>;
-  validationRules: Record<string, string>;
   expertRequirement?: { roles: string[]; languages?: string[] };
   export: { format: string; fields: string[] };
+  minComponents: { name: string; min: number }[];
+  name: string;
+  schema: Record<
+    string,
+    { required?: boolean; type: string; description?: string }
+  >;
+  threshold: number;
+  validationRules: Record<string, string>;
+  version: string;
+  vertical: Vertical;
+  weights: Record<string, number>;
 }
 
-export type VerificationBasis = "observed" | "speaker_attested" | "reviewer_attested" | "inferred";
+export type VerificationBasis =
+  | "observed"
+  | "speaker_attested"
+  | "reviewer_attested"
+  | "inferred";
 
 export interface IdiomTranslation {
+  register: string;
   targetLanguage: string;
   text: string;
-  register: string;
 }
 
 export interface FieldVerification {
+  basis: VerificationBasis;
+  evidenceIds: string[];
   field: string;
+  reviewedAtMs: number;
   reviewerId: string;
   reviewerRole: "speaker" | "fluent_reviewer" | "adjudicator";
   verdict: "verified" | "rejected" | "alternative" | "insufficient_context";
-  basis: VerificationBasis;
-  evidenceIds: string[];
-  reviewedAtMs: number;
 }
 
 export interface IdiomContextPayload {
-  expression_span: { text: string; start_ms: number; end_ms: number };
+  alternative_readings: Array<{ reading: string; supporting_context: string }>;
   context: string;
+  expression_span: { text: string; start_ms: number; end_ms: number };
+  failure_explanation?: string;
+  known_bad_translation?: {
+    text: string;
+    provenance: "observed" | "constructed";
+  };
   literal_meaning: string;
   meaning_in_source_language: string;
-  speaker_intent: { value: string; basis: "speaker_attested" | "inferred" | "unknown" };
-  social_function: string[];
-  usage_conditions: string;
-  alternative_readings: Array<{ reading: string; supporting_context: string }>;
-  translations: IdiomTranslation[];
-  known_bad_translation?: { text: string; provenance: "observed" | "constructed" };
-  failure_explanation?: string;
   review_evidence: FieldVerification[];
+  social_function: string[];
   source_asset_id: string;
   source_group_id: string;
+  speaker_intent: {
+    value: string;
+    basis: "speaker_attested" | "inferred" | "unknown";
+  };
   transcript: string;
+  translations: IdiomTranslation[];
+  usage_conditions: string;
 }
 
 // Input envelope for the ingest endpoint.
 export interface IngestInput {
-  modality?: Modality;
-  text?: string;
-  audioKey?: string;
   audioDurationSec?: number;
+  audioKey?: string;
+  meta?: Record<string, unknown>;
+  modality?: Modality;
   source?: string;
   tenant?: string;
-  meta?: Record<string, unknown>;
+  text?: string;
   vertical?: Vertical;
 }
 
 export interface NegotiateInput {
-  taskId: string;
   assetId: string;
-  tenant: string;
-  vertical: Vertical;
-  text: string;
   contractId: string;
+  taskId: string;
   team: SpecialistTeam;
+  tenant: string;
+  text: string;
+  vertical: Vertical;
 }
 
 export interface ResolveInput {
-  taskId: string;
+  correction: Record<string, unknown>;
   escalationId: string;
   expertId: string;
-  correction: Record<string, unknown>;
   resolutionText: string;
+  taskId: string;
 }

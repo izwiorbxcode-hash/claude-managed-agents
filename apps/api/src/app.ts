@@ -5,6 +5,7 @@ import type { Env, Variables } from "./env.js";
 import { requestIdMiddleware } from "./middleware/requestId.js";
 import { healthRoutes } from "./routes/health.js";
 import { izwaRoutes } from "./routes/izwa.js";
+import { idiomRoutes } from "./routes/idioms.js";
 import { projectsRoutes } from "./routes/projects.js";
 
 export const createApp = () => {
@@ -26,7 +27,13 @@ export const createApp = () => {
       allowMethods: ["GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"],
       credentials: true,
       maxAge: 86_400,
-      origin: "*",
+      origin: (origin, c) => {
+        const configured = c.env?.CORS_ORIGIN?.trim();
+        if (configured) {
+          return origin === configured ? origin : configured;
+        }
+        return origin;
+      },
     })
   );
 
@@ -36,6 +43,7 @@ export const createApp = () => {
   app.route("/", healthRoutes);
   app.route("/", projectsRoutes);
   app.route("/", izwaRoutes);
+  app.route("/", idiomRoutes);
 
   app.get("/", (c) => c.text("IzwaAI API — OK"));
 

@@ -362,6 +362,41 @@ export const api = {
     request<unknown>(`/api/sessions/${id}/archive`, { method: "POST" }),
 };
 
+export interface IdiomReviewItem {
+  taskId: string;
+  assetId: string;
+  escalationId: string;
+  phase: "speaker_review" | "fluent_review" | "adjudication";
+  transcript: string;
+  sourceGroupId: string;
+  seed: {
+    expression_span?: { text?: string; start_ms?: number; end_ms?: number };
+    context?: string;
+    transcript?: string;
+  } | null;
+  machineSuggestions: unknown;
+  blind: boolean;
+}
+
+export const idiomApi = {
+  queue: (reviewerToken: string) =>
+    request<{ items: IdiomReviewItem[] }>("/api/izwa/idioms/review-queue", {
+      headers: { authorization: `Bearer ${reviewerToken}` },
+    }),
+  submit: (reviewerToken: string, taskId: string, body: unknown) =>
+    request<{ status: string; recordId?: string; missing?: string[]; conflicts?: string[] }>(
+      `/api/izwa/idioms/tasks/${encodeURIComponent(taskId)}/reviews`,
+      {
+        method: "POST",
+        headers: {
+          authorization: `Bearer ${reviewerToken}`,
+          "content-type": "application/json",
+        },
+        body: JSON.stringify(body),
+      },
+    ),
+};
+
 export interface AnthropicAgent {
   id: string;
   name: string;

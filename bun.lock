@@ -51,6 +51,17 @@
         "typescript": "catalog:",
       },
     },
+    "apps/annotator": {
+      "name": "@izwa/annotator",
+      "version": "0.1.0",
+      "dependencies": {
+        "@izwa/annotation": "workspace:*",
+        "@izwa/taxonomy": "workspace:*",
+      },
+      "devDependencies": {
+        "typescript": "catalog:",
+      },
+    },
     "apps/api": {
       "name": "@unsung/api-worker",
       "version": "0.1.0",
@@ -86,10 +97,23 @@
       },
     },
     "apps/web": {
-      "name": "@unsung/web",
+      "name": "@izwa/web",
       "version": "0.1.0",
+      "dependencies": {
+        "@izwa/taxonomy": "workspace:*",
+        "hono": "catalog:",
+        "react": "^19.0.0",
+        "react-dom": "^19.0.0",
+        "react-router-dom": "^7.14.2",
+        "zod": "catalog:",
+      },
       "devDependencies": {
+        "@types/react": "^19.0.0",
+        "@types/react-dom": "^19.0.0",
+        "@vitejs/plugin-react": "^4.3.4",
         "typescript": "catalog:",
+        "vite": "^6.0.0",
+        "wrangler": "catalog:",
       },
     },
     "infrastructure/cloudflare": {
@@ -630,6 +654,8 @@
 
     "@izwa/annotation": ["@izwa/annotation@workspace:packages/annotation"],
 
+    "@izwa/annotator": ["@izwa/annotator@workspace:apps/annotator"],
+
     "@izwa/datasets": ["@izwa/datasets@workspace:packages/datasets"],
 
     "@izwa/embeddings": ["@izwa/embeddings@workspace:packages/embeddings"],
@@ -637,6 +663,8 @@
     "@izwa/evaluation": ["@izwa/evaluation@workspace:packages/evaluation"],
 
     "@izwa/taxonomy": ["@izwa/taxonomy@workspace:packages/taxonomy"],
+
+    "@izwa/web": ["@izwa/web@workspace:apps/web"],
 
     "@izwa/worker-agent-session": ["@izwa/worker-agent-session@workspace:workers/agent-session"],
 
@@ -887,8 +915,6 @@
     "@unsung/ui": ["@unsung/ui@workspace:packages/ui"],
 
     "@unsung/validation": ["@unsung/validation@workspace:packages/validation"],
-
-    "@unsung/web": ["@unsung/web@workspace:apps/web"],
 
     "@vercel/oidc": ["@vercel/oidc@3.2.0", "", {}, "sha512-UycprH3T6n3jH0k44NHMa7pnFHGu/N05MjojYr+Mc6I7obkoLIJujSWwin1pCvdy/eOxrI/l3uDLQsmcrOb4ug=="],
 
