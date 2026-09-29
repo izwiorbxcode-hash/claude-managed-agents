@@ -6,6 +6,9 @@
 IzwaAI is a learned-data company whose first frontier is African language
 intelligence. This repo is a Bun + Turborepo monorepo (Unsung Stack template):
 
+Start with the [product guide](docs/product-guide.md), [system map](docs/system-map.md),
+[developer guide](docs/developer-guide.md), and [web deployment guide](docs/web-deployment.md).
+
 - `apps/api` — Hono + Effect worker (canonical API, `apps/api/wrangler.jsonc`)
 - `apps/web` — web SPA · `apps/annotator` — human-in-the-loop · `apps/mobile` — Expo field app
 - `packages/domain/src/izwa` — refinery kernel (LDU pipeline)

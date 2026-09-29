@@ -21,19 +21,26 @@ import {
   Archive,
   Browser,
   EnvelopeSimple,
+  RocketLaunch,
+  Code,
+  MapTrifold,
 } from "@phosphor-icons/react";
 
-import about from "../../../../docs/about.md?raw";
-import isolateVsVm from "../../../../docs/isolate-vs-vm-sandboxes.md?raw";
-import customizingSandboxes from "../../../../docs/customizing-sandboxes.md?raw";
-import architecture from "../../../../docs/architecture.md?raw";
-import applyingEgress from "../../../../docs/applying-egress-policies.md?raw";
-import connectingPrivate from "../../../../docs/connecting-to-private-services.md?raw";
-import browserRenderingTools from "../../../../docs/browser-rendering-tools.md?raw";
-import agentEmail from "../../../../docs/agent-email.md?raw";
-import addingTools from "../../../../docs/adding-custom-tools.md?raw";
-import snapshots from "../../../../docs/snapshots-and-state-persistence.md?raw";
-import securingAccess from "../../../../docs/securing-access.md?raw";
+import productGuide from "../../../../../../docs/product-guide.md?raw";
+import systemMap from "../../../../../../docs/system-map.md?raw";
+import developerGuide from "../../../../../../docs/developer-guide.md?raw";
+import deployment from "../../../../../../docs/web-deployment.md?raw";
+import about from "../../../../../../docs/about.md?raw";
+import isolateVsVm from "../../../../../../docs/isolate-vs-vm-sandboxes.md?raw";
+import customizingSandboxes from "../../../../../../docs/customizing-sandboxes.md?raw";
+import architecture from "../../../../../../docs/architecture.md?raw";
+import applyingEgress from "../../../../../../docs/applying-egress-policies.md?raw";
+import connectingPrivate from "../../../../../../docs/connecting-to-private-services.md?raw";
+import browserRenderingTools from "../../../../../../docs/browser-rendering-tools.md?raw";
+import agentEmail from "../../../../../../docs/agent-email.md?raw";
+import addingTools from "../../../../../../docs/adding-custom-tools.md?raw";
+import snapshots from "../../../../../../docs/snapshots-and-state-persistence.md?raw";
+import securingAccess from "../../../../../../docs/securing-access.md?raw";
 
 export interface DocPage {
   slug: string;
@@ -49,6 +56,38 @@ export interface DocPage {
 }
 
 export const DOCS: DocPage[] = [
+  {
+    slug: "product-guide",
+    title: "IzwaAI Product Guide",
+    sidebarTitle: "Product Guide",
+    description: "What the learned-data platform does and how its refinery turns evidence into reusable intelligence.",
+    icon: MapTrifold,
+    content: productGuide,
+  },
+  {
+    slug: "system-map",
+    title: "System Map",
+    sidebarTitle: "System Map",
+    description: "A map of every app, worker, package, data store, and boundary in the monorepo.",
+    icon: TreeStructure,
+    content: systemMap,
+  },
+  {
+    slug: "developer-guide",
+    title: "Developer Guide",
+    sidebarTitle: "Developer Guide",
+    description: "Set up, run, test, and safely extend IzwaAI locally.",
+    icon: Code,
+    content: developerGuide,
+  },
+  {
+    slug: "web-deployment",
+    title: "Web Deployment",
+    sidebarTitle: "Deploy Web",
+    description: "Build, preview, and deploy the standalone SPA to Cloudflare Workers.",
+    icon: RocketLaunch,
+    content: deployment,
+  },
   {
     slug: "about",
     title: "About",

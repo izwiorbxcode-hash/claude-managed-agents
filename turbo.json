@@ -36,6 +36,7 @@
       "interactive": true
     },
     "deploy": {
+      "dependsOn": ["build"],
       "cache": false,
       "interactive": true
     }

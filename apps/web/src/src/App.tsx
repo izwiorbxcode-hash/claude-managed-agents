@@ -108,7 +108,7 @@ const NAV_GROUPS: NavGroup[] = [
     collapsible: true,
     defaultOpen: false,
     items: [
-      ...docNavItems(["about", "architecture"]),
+      ...docNavItems(["product-guide", "system-map", "developer-guide", "web-deployment"]),
       ...DOCS.filter(
         (d) => d.slug !== "about" && d.slug !== "architecture",
       ).map((d) => ({
@@ -206,7 +206,7 @@ function AppShell() {
           <div className="sidebar-account">
             <CloudflareLogo variant="glyph" />
             <span className="sidebar-account-name">
-              Cloudflare Claude Agents
+              IzwaAI Platform
             </span>
           </div>
         </Sidebar.Header>

@@ -10,7 +10,7 @@ export type Modality =
   | "video"
   | "structured";
 
-export type Vertical = "language";
+export type Vertical = "language" | "idiom-context";
 
 export type SpecialistRole =
   | "phonetics"
@@ -124,6 +124,42 @@ export interface QualityContract {
   validationRules: Record<string, string>;
   expertRequirement?: { roles: string[]; languages?: string[] };
   export: { format: string; fields: string[] };
+}
+
+export type VerificationBasis = "observed" | "speaker_attested" | "reviewer_attested" | "inferred";
+
+export interface IdiomTranslation {
+  targetLanguage: string;
+  text: string;
+  register: string;
+}
+
+export interface FieldVerification {
+  field: string;
+  reviewerId: string;
+  reviewerRole: "speaker" | "fluent_reviewer" | "adjudicator";
+  verdict: "verified" | "rejected" | "alternative" | "insufficient_context";
+  basis: VerificationBasis;
+  evidenceIds: string[];
+  reviewedAtMs: number;
+}
+
+export interface IdiomContextPayload {
+  expression_span: { text: string; start_ms: number; end_ms: number };
+  context: string;
+  literal_meaning: string;
+  meaning_in_source_language: string;
+  speaker_intent: { value: string; basis: "speaker_attested" | "inferred" | "unknown" };
+  social_function: string[];
+  usage_conditions: string;
+  alternative_readings: Array<{ reading: string; supporting_context: string }>;
+  translations: IdiomTranslation[];
+  known_bad_translation?: { text: string; provenance: "observed" | "constructed" };
+  failure_explanation?: string;
+  review_evidence: FieldVerification[];
+  source_asset_id: string;
+  source_group_id: string;
+  transcript: string;
 }
 
 // Input envelope for the ingest endpoint.
