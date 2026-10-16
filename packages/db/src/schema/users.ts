@@ -1,4 +1,4 @@
-import { integer, sqliteTable, text } from "drizzle-orm/sqlite-core";
+import { index, integer, sqliteTable, text } from "drizzle-orm/sqlite-core";
 
 /**
  * Minimal Better Auth–compatible users table.
@@ -40,20 +40,49 @@ export const sessions = sqliteTable("session", {
 
 export const accounts = sqliteTable("account", {
   accessToken: text("access_token"),
+  accessTokenExpiresAt: integer("access_token_expires_at", {
+    mode: "timestamp",
+  }),
   accountId: text("account_id").notNull(),
   createdAt: integer("created_at", { mode: "timestamp" })
     .notNull()
     .$defaultFn(() => new Date()),
-  expiresAt: integer("expires_at", { mode: "timestamp" }),
   id: text("id").primaryKey(),
   idToken: text("id_token"),
+  // Better Auth 1.7 requires `issuer` and keys the unique index on
+  // (issuer, accountId). For the credential provider it is the provider id.
+  issuer: text("issuer").notNull(),
   password: text("password"),
   providerId: text("provider_id").notNull(),
   refreshToken: text("refresh_token"),
+  refreshTokenExpiresAt: integer("refresh_token_expires_at", {
+    mode: "timestamp",
+  }),
+  scope: text("scope"),
   updatedAt: integer("updated_at", { mode: "timestamp" })
     .notNull()
     .$defaultFn(() => new Date()),
   userId: text("user_id")
     .notNull()
     .references(() => users.id, { onDelete: "cascade" }),
+}, (table) => [
+  index("account_issuer_account_id_unique").on(table.issuer, table.accountId),
+  index("account_user_id_idx").on(table.userId),
+]);
+
+/**
+ * Better Auth's `verification` table. Stores email-verification and
+ * password-reset tokens; rows are keyed by the opaque identifier handed to
+ * the recipient and carry no foreign key, so they expire by age alone.
+ */
+export const verifications = sqliteTable("verification", {
+  createdAt: integer("created_at", { mode: "timestamp" })
+    .notNull()
+    .$defaultFn(() => new Date()),
+  expiresAt: integer("expires_at", { mode: "timestamp" }).notNull(),
+  identifier: text("identifier").notNull(),
+  updatedAt: integer("updated_at", { mode: "timestamp" })
+    .notNull()
+    .$defaultFn(() => new Date()),
+  value: text("value").notNull(),
 });

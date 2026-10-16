@@ -1,3 +1,4 @@
+import type { D1PreparedStatement } from "@cloudflare/workers-types";
 import { Izwa } from "@unsung/domain";
 import { Hono } from "hono";
 import type { Env, Variables } from "../env.js";
@@ -112,11 +113,23 @@ function jsonArray(value: unknown): unknown[] {
   return Array.isArray(value) ? value : [];
 }
 
+function resolveModality(mimeType: string): "audio" | "video" | null {
+  if (mimeType.startsWith("video/")) {
+    return "video";
+  }
+  if (mimeType.startsWith("audio/")) {
+    return "audio";
+  }
+  return null;
+}
+
 function splitFor(sourceGroupId: string): "train" | "validation" | "test" {
   let hash = 2_166_136_261;
   for (const char of sourceGroupId) {
+    // biome-ignore lint/suspicious/noBitwiseOperators: FNV-1a requires xor + imul; changing it would reshuffle dataset splits
     hash = Math.imul(hash ^ char.charCodeAt(0), 16_777_619);
   }
+  // biome-ignore lint/suspicious/noBitwiseOperators: `>>> 0` coerces to uint32 to keep buckets stable across engines
   const bucket = (hash >>> 0) % 100;
   if (bucket < 80) {
     return "train";
@@ -211,7 +224,7 @@ async function transcribe(
     throw new Error("Workers AI binding is unavailable");
   }
   const result = (await (
-    env.AI as { run(model: string, input: unknown): Promise<unknown> }
+    env.AI as { run: (model: string, input: unknown) => Promise<unknown> }
   ).run("@cf/openai/whisper-large-v3-turbo", {
     audio: bytesToBase64(bytes),
     task: "transcribe",
@@ -228,6 +241,306 @@ function bytesToBase64(bytes: ArrayBuffer): string {
     binary += String.fromCharCode(...view.subarray(offset, offset + chunkSize));
   }
   return btoa(binary);
+}
+
+interface ReviewRow {
+  payload_json: string;
+  reviewer_id: string;
+  reviewer_role: string;
+}
+
+const REVIEWER_ROLES = ["speaker", "fluent_reviewer", "adjudicator"] as const;
+const PHASE_REQUIRED_ROLE: Record<string, ReviewerRole> = {
+  adjudication: "adjudicator",
+  fluent_review: "fluent_reviewer",
+  speaker_review: "speaker",
+};
+
+type ReviewPreflight =
+  | { error: string; status: 403 | 404 | 409 | 422 }
+  | {
+      evidenceIds: string[];
+      existingReviews: ReviewRow[];
+      payload: JsonObject;
+      reviewerId: string;
+      role: ReviewerRole;
+      task: Record<string, unknown>;
+      verifiedFields: string[];
+    };
+
+type CrystallizeResult =
+  | { error: string; violations: unknown[] }
+  | { recordId: string };
+
+function isReviewerRole(value: unknown): value is ReviewerRole {
+  return REVIEWER_ROLES.includes(value as ReviewerRole);
+}
+
+function stringList(value: unknown): string[] {
+  return jsonArray(value).filter(
+    (item): item is string => typeof item === "string"
+  );
+}
+
+// Authorization and shape checks for a review submission. Returns either the
+// validated context or the exact error response the route should emit — keeps
+// the route handler a thin orchestration layer.
+async function reviewPreflight(
+  env: Env,
+  taskId: string,
+  identity: ReviewIdentity,
+  body: JsonObject
+): Promise<ReviewPreflight> {
+  const role = body.reviewerRole;
+  if (!isReviewerRole(role)) {
+    return {
+      error: "reviewerRole must be speaker, fluent_reviewer, or adjudicator",
+      status: 422,
+    };
+  }
+  if (!identity.roles.includes(role)) {
+    return { error: "reviewer token does not grant this role", status: 403 };
+  }
+  const payload = jsonObject(body.payload);
+  const verifiedFields = stringList(body.verifiedFields);
+  if (!payload || verifiedFields.length === 0) {
+    return { error: "payload and verifiedFields are required", status: 422 };
+  }
+  const task = await env.DATABASE.prepare(
+    `SELECT t.*, a.source_group_id, a.r2_key FROM izwa_tasks t
+     JOIN izwa_assets a ON a.asset_id=t.asset_id WHERE t.task_id=?1`
+  )
+    .bind(taskId)
+    .first<Record<string, unknown>>();
+  if (task?.vertical !== "idiom-context") {
+    return { error: "idiom task not found", status: 404 };
+  }
+  if (String(task.tenant) !== identity.tenant) {
+    return {
+      error: "reviewer token is not valid for this tenant",
+      status: 403,
+    };
+  }
+  const requiredRole = PHASE_REQUIRED_ROLE[String(task.phase)];
+  if (role !== requiredRole) {
+    return {
+      error: `this task requires the ${requiredRole ?? "assigned"} role`,
+      status: 409,
+    };
+  }
+  const existing = await env.DATABASE.prepare(
+    "SELECT reviewer_id, reviewer_role, payload_json FROM izwa_reviews WHERE task_id=?1 ORDER BY created_at_ms"
+  )
+    .bind(taskId)
+    .all<ReviewRow>();
+  const existingReviews = existing.results ?? [];
+  const hasSpeakerReview = existingReviews.some(
+    (review) => review.reviewer_role === "speaker"
+  );
+  if (
+    existingReviews.some((review) => review.reviewer_id === identity.reviewerId)
+  ) {
+    return { error: "reviewer already submitted for this task", status: 409 };
+  }
+  if (role !== "speaker" && !hasSpeakerReview) {
+    return { error: "speaker review must be completed first", status: 409 };
+  }
+  return {
+    evidenceIds: stringList(body.evidenceIds),
+    existingReviews,
+    payload,
+    reviewerId: identity.reviewerId,
+    role,
+    task,
+    verifiedFields,
+  };
+}
+
+function buildReviewStatements(
+  env: Env,
+  input: {
+    basis: string;
+    evidenceIds: string[];
+    payload: JsonObject;
+    reviewerId: string;
+    reviewId: string;
+    role: ReviewerRole;
+    taskId: string;
+    verdict: string;
+    verifiedFields: string[];
+    now: number;
+  }
+): D1PreparedStatement[] {
+  const {
+    basis,
+    evidenceIds,
+    now,
+    payload,
+    reviewerId,
+    reviewId,
+    role,
+    taskId,
+    verdict,
+    verifiedFields,
+  } = input;
+  return [
+    env.DATABASE.prepare(
+      `INSERT INTO izwa_reviews
+       (review_id, task_id, reviewer_id, reviewer_role, stage, verdict, blind, payload_json,
+        verified_fields_json, evidence_ids_json, created_at_ms)
+       VALUES (?1, ?2, ?3, ?4, ?5, ?6, 1, ?7, ?8, ?9, ?10)`
+    ).bind(
+      reviewId,
+      taskId,
+      reviewerId,
+      role,
+      role === "speaker" ? "interpretation" : "verification",
+      verdict,
+      JSON.stringify(payload),
+      JSON.stringify(verifiedFields),
+      JSON.stringify(evidenceIds),
+      now
+    ),
+    ...verifiedFields.map((field) =>
+      env.DATABASE.prepare(
+        `INSERT INTO izwa_field_verifications
+         (verification_id, task_id, field, reviewer_id, reviewer_role, verdict, basis, evidence_ids_json, reviewed_at_ms)
+         VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9)`
+      ).bind(
+        newId("verify_"),
+        taskId,
+        field,
+        reviewerId,
+        role,
+        verdict,
+        basis,
+        JSON.stringify(evidenceIds),
+        now
+      )
+    ),
+  ];
+}
+
+// Speaker and fluent-reviewer disagreeing on a required field escalates the
+// task to adjudication instead of crystallizing it.
+function detectSpeakerConflicts(
+  speakerReview: ReviewRow | undefined,
+  payload: JsonObject,
+  role: ReviewerRole
+): string[] | null {
+  if (role !== "fluent_reviewer" || !speakerReview) {
+    return null;
+  }
+  const speakerPayload = JSON.parse(speakerReview.payload_json) as JsonObject;
+  const conflicts = IDIOM_REQUIRED_REVIEW_FIELDS.filter(
+    (field) =>
+      JSON.stringify(speakerPayload[field]) !== JSON.stringify(payload[field])
+  );
+  return conflicts.length > 0 ? conflicts : null;
+}
+
+async function setTaskPhase(
+  env: Env,
+  taskId: string,
+  phase: string,
+  now: number
+): Promise<void> {
+  await env.DATABASE.prepare(
+    "UPDATE izwa_tasks SET phase=?2, updated_at_ms=?3 WHERE task_id=?1"
+  )
+    .bind(taskId, phase, now)
+    .run();
+}
+
+async function loadReviewEvidence(
+  env: Env,
+  taskId: string
+): Promise<Izwa.FieldVerification[]> {
+  const verifications = await env.DATABASE.prepare(
+    "SELECT field, reviewer_id, reviewer_role, verdict, basis, evidence_ids_json, reviewed_at_ms FROM izwa_field_verifications WHERE task_id=?1"
+  )
+    .bind(taskId)
+    .all<Record<string, unknown>>();
+  return (verifications.results ?? []).map((row) => ({
+    basis: String(row.basis),
+    evidenceIds: JSON.parse(String(row.evidence_ids_json || "[]")),
+    field: String(row.field),
+    reviewedAtMs: Number(row.reviewed_at_ms),
+    reviewerId: String(row.reviewer_id),
+    reviewerRole: String(row.reviewer_role),
+    verdict: String(row.verdict),
+  })) as Izwa.FieldVerification[];
+}
+
+async function crystallizeIdiomReview(
+  env: Env,
+  input: {
+    now: number;
+    payload: JsonObject;
+    reviewEvidence: Izwa.FieldVerification[];
+    reviewerId: string;
+    task: Record<string, unknown>;
+    taskId: string;
+  }
+): Promise<CrystallizeResult> {
+  const { now, payload, reviewEvidence, reviewerId, task, taskId } = input;
+  const validationPayload = { ...payload, review_evidence: reviewEvidence };
+  const violations = validateIdiomPayload(validationPayload);
+  if (violations.length > 0) {
+    return { error: "contract validation failed", violations };
+  }
+  const recordId = newId("record_");
+  const quality = {
+    components: [{ name: "field_level_human_approval", score: 1, weight: 1 }],
+    humanRequired: true,
+    overall: 1,
+    satisfied: true,
+    threshold: 1,
+    unsatisfiedGates: [],
+  };
+  await env.DATABASE.batch([
+    env.DATABASE.prepare(
+      `INSERT INTO izwa_records
+       (record_id, task_id, contract_id, vertical, tenant, payload_json, quality_json,
+        verification_status, verified_by, model_versions_json, schema_version, provenance_json,
+        created_at_ms, export_status)
+       VALUES (?1, ?2, ?3, 'idiom-context', ?4, ?5, ?6, 'human_verified', ?7, '{}',
+       'idiom-context-v1', ?8, ?9, 'pending')`
+    ).bind(
+      recordId,
+      taskId,
+      IDIOM_CONTEXT_CONTRACT.contractId,
+      String(task.tenant),
+      JSON.stringify(validationPayload),
+      JSON.stringify(quality),
+      reviewerId,
+      JSON.stringify({
+        approvals: reviewEvidence.length,
+        sourceGroupId: task.source_group_id,
+      }),
+      now
+    ),
+    env.DATABASE.prepare(
+      "UPDATE izwa_field_verifications SET record_id=?2 WHERE task_id=?1"
+    ).bind(taskId, recordId),
+    env.DATABASE.prepare(
+      "UPDATE izwa_tasks SET status='crystallized', phase='resolved', updated_at_ms=?2 WHERE task_id=?1"
+    ).bind(taskId, now),
+    env.DATABASE.prepare(
+      "UPDATE izwa_escalations SET status='resolved', expert_id=?2, resolved_record_id=?3, resolved_at_ms=?4 WHERE task_id=?1"
+    ).bind(taskId, reviewerId, recordId, now),
+    env.DATABASE.prepare(
+      `INSERT INTO izwa_evidence_edges (edge_id, from_ref, to_ref, relationship, root_source_id, trust_tier, created_at_ms)
+       VALUES (?1, ?2, ?3, 'human_verified_derivation', ?4, 'human_verified', ?5)`
+    ).bind(
+      newId("edge_"),
+      String(task.asset_id),
+      recordId,
+      String(task.source_group_id || task.asset_id),
+      now
+    ),
+  ]);
+  return { recordId };
 }
 
 export const idiomRoutes = new Hono<{ Bindings: Env; Variables: Variables }>()
@@ -248,12 +561,8 @@ export const idiomRoutes = new Hono<{ Bindings: Env; Variables: Variables }>()
       return c.json({ error: "empty media body" }, 400);
     }
     const mimeType = c.req.header("content-type") || "application/octet-stream";
-    const modality = mimeType.startsWith("video/")
-      ? "video"
-      : mimeType.startsWith("audio/")
-        ? "audio"
-        : null;
-    if (!modality) {
+    const modality = resolveModality(mimeType);
+    if (modality === null) {
       return c.json({ error: "only audio/* or video/* is accepted" }, 415);
     }
     const assetId = newId("asset_");
@@ -409,6 +718,48 @@ export const idiomRoutes = new Hono<{ Bindings: Env; Variables: Variables }>()
       vtt: output.vtt,
     });
   })
+  .patch("/api/izwa/media/:assetId/transcript", async (c) => {
+    const assetId = c.req.param("assetId");
+    const body = jsonObject(await c.req.json().catch(() => null));
+    const transcript =
+      typeof body?.transcript === "string" ? body.transcript.trim() : "";
+    if (!transcript) {
+      return c.json({ error: "corrected transcript is required" }, 422);
+    }
+    const asset = await c.env.DATABASE.prepare(
+      "SELECT asset_id FROM izwa_assets WHERE asset_id=?1"
+    )
+      .bind(assetId)
+      .first<{ asset_id: string }>();
+    if (!asset) {
+      return c.json({ error: "asset not found" }, 404);
+    }
+    const now = Date.now();
+    await c.env.DATABASE.batch([
+      c.env.DATABASE.prepare(
+        "UPDATE izwa_assets SET text_content=?2 WHERE asset_id=?1"
+      ).bind(assetId, transcript),
+      c.env.DATABASE.prepare(
+        `UPDATE izwa_media_segments
+         SET transcript=?2, transcript_status='human_corrected'
+         WHERE asset_id=?1`
+      ).bind(assetId, transcript),
+      c.env.DATABASE.prepare(
+        `INSERT INTO izwa_provenance
+         (provenance_id, task_id, step, ref_type, ref_id, detail_json, created_at_ms)
+         VALUES (?1, ?2, 'correct', 'asset', ?2, ?3, ?4)`
+      ).bind(
+        newId("prov_"),
+        assetId,
+        JSON.stringify({
+          correctedBy: actor(c),
+          transcriptStatus: "human_corrected",
+        }),
+        now
+      ),
+    ]);
+    return c.json({ assetId, status: "human_corrected", transcript });
+  })
   .post("/api/izwa/idioms/tasks", async (c) => {
     const body = jsonObject(await c.req.json().catch(() => null));
     if (!body) {
@@ -442,14 +793,21 @@ export const idiomRoutes = new Hono<{ Bindings: Env; Variables: Variables }>()
     const escalationId = newId("escalation_");
     const now = Date.now();
     const seed = {
+      alternative_readings: jsonArray(body.alternative_readings),
       context: typeof body.context === "string" ? body.context : "",
       expression_span: expression,
+      intended_meaning:
+        typeof body.intended_meaning === "string" ? body.intended_meaning : "",
+      literal_meaning:
+        typeof body.literal_meaning === "string" ? body.literal_meaning : "",
+      social_function: jsonArray(body.social_function),
       source_asset_id: assetId,
       source_group_id: asset.source_group_id || assetId,
       transcript:
         typeof body.transcript === "string"
           ? body.transcript
           : asset.text_content || "",
+      uncertainty: typeof body.uncertainty === "string" ? body.uncertainty : "",
     };
     await c.env.DATABASE.batch([
       c.env.DATABASE.prepare(
@@ -504,7 +862,10 @@ export const idiomRoutes = new Hono<{ Bindings: Env; Variables: Variables }>()
     try {
       identity = await requireReviewIdentity(c.env, c.req.raw);
     } catch (error) {
-      return c.json({ error: error instanceof Error ? error.message : "unauthorized" }, 401);
+      return c.json(
+        { error: error instanceof Error ? error.message : "unauthorized" },
+        401
+      );
     }
     const { reviewerId } = identity;
     const rows = await c.env.DATABASE.prepare(
@@ -551,246 +912,87 @@ export const idiomRoutes = new Hono<{ Bindings: Env; Variables: Variables }>()
     try {
       identity = await requireReviewIdentity(c.env, c.req.raw);
     } catch (error) {
-      return c.json({ error: error instanceof Error ? error.message : "unauthorized" }, 401);
-    }
-    const { reviewerId } = identity;
-    const role = body.reviewerRole as ReviewerRole;
-    if (
-      !(["speaker", "fluent_reviewer", "adjudicator"] as string[]).includes(
-        role
-      )
-    ) {
       return c.json(
-        {
-          error:
-            "reviewerRole must be speaker, fluent_reviewer, or adjudicator",
-        },
-        422
+        { error: error instanceof Error ? error.message : "unauthorized" },
+        401
       );
     }
-    if (!identity.roles.includes(role)) {
-      return c.json({ error: "reviewer token does not grant this role" }, 403);
+    const preflight = await reviewPreflight(c.env, taskId, identity, body);
+    if ("error" in preflight) {
+      return c.json({ error: preflight.error }, preflight.status);
     }
-    const payload = jsonObject(body.payload);
-    const verifiedFields = jsonArray(body.verifiedFields).filter(
-      (field): field is string => typeof field === "string"
-    );
-    const evidenceIds = jsonArray(body.evidenceIds).filter(
-      (id): id is string => typeof id === "string"
-    );
-    if (!payload || verifiedFields.length === 0) {
-      return c.json({ error: "payload and verifiedFields are required" }, 422);
-    }
-    const task = await c.env.DATABASE.prepare(
-      `SELECT t.*, a.source_group_id, a.r2_key FROM izwa_tasks t
-       JOIN izwa_assets a ON a.asset_id=t.asset_id WHERE t.task_id=?1`
-    )
-      .bind(taskId)
-      .first<Record<string, unknown>>();
-    if (!task || task.vertical !== "idiom-context") {
-      return c.json({ error: "idiom task not found" }, 404);
-    }
-    if (String(task.tenant) !== identity.tenant) {
-      return c.json(
-        { error: "reviewer token is not valid for this tenant" },
-        403
-      );
-    }
-    const requiredRole = {
-      adjudication: "adjudicator",
-      fluent_review: "fluent_reviewer",
-      speaker_review: "speaker",
-    }[String(task.phase)];
-    if (role !== requiredRole) {
-      return c.json(
-        { error: `this task requires the ${requiredRole ?? "assigned"} role` },
-        409
-      );
-    }
-    const existingRoles = await c.env.DATABASE.prepare(
-      "SELECT reviewer_id, reviewer_role, payload_json FROM izwa_reviews WHERE task_id=?1 ORDER BY created_at_ms"
-    )
-      .bind(taskId)
-      .all<{
-        reviewer_id: string;
-        reviewer_role: string;
-        payload_json: string;
-      }>();
-    if (
-      (existingRoles.results ?? []).some(
-        (review) => review.reviewer_id === reviewerId
-      )
-    ) {
-      return c.json({ error: "reviewer already submitted for this task" }, 409);
-    }
-    if (
-      role !== "speaker" &&
-      !(existingRoles.results ?? []).some(
-        (review) => review.reviewer_role === "speaker"
-      )
-    ) {
-      return c.json({ error: "speaker review must be completed first" }, 409);
-    }
+    const {
+      evidenceIds,
+      existingReviews,
+      payload,
+      reviewerId,
+      role,
+      task,
+      verifiedFields,
+    } = preflight;
     const now = Date.now();
     const reviewId = newId("review_");
-    const statements = [
-      c.env.DATABASE.prepare(
-        `INSERT INTO izwa_reviews
-         (review_id, task_id, reviewer_id, reviewer_role, stage, verdict, blind, payload_json,
-          verified_fields_json, evidence_ids_json, created_at_ms)
-         VALUES (?1, ?2, ?3, ?4, ?5, ?6, 1, ?7, ?8, ?9, ?10)`
-      ).bind(
-        reviewId,
-        taskId,
+    const verdict = String(body.verdict || "verified");
+    const basis = String(
+      body.basis ||
+        (role === "speaker" ? "speaker_attested" : "reviewer_attested")
+    );
+    await c.env.DATABASE.batch(
+      buildReviewStatements(c.env, {
+        basis,
+        evidenceIds,
+        now,
+        payload,
         reviewerId,
+        reviewId,
         role,
-        role === "speaker" ? "interpretation" : "verification",
-        String(body.verdict || "verified"),
-        JSON.stringify(payload),
-        JSON.stringify(verifiedFields),
-        JSON.stringify(evidenceIds),
-        now
-      ),
-      ...verifiedFields.map((field) =>
-        c.env.DATABASE.prepare(
-          `INSERT INTO izwa_field_verifications
-         (verification_id, task_id, field, reviewer_id, reviewer_role, verdict, basis, evidence_ids_json, reviewed_at_ms)
-         VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9)`
-        ).bind(
-          newId("verify_"),
-          taskId,
-          field,
-          reviewerId,
-          role,
-          String(body.verdict || "verified"),
-          String(
-            body.basis ||
-              (role === "speaker" ? "speaker_attested" : "reviewer_attested")
-          ),
-          JSON.stringify(evidenceIds),
-          now
-        )
-      ),
-    ];
-    await c.env.DATABASE.batch(statements);
+        taskId,
+        verdict,
+        verifiedFields,
+      })
+    );
 
-    const speakerReview = (existingRoles.results ?? []).find(
+    const speakerReview = existingReviews.find(
       (review) => review.reviewer_role === "speaker"
     );
-    if (role === "fluent_reviewer" && speakerReview) {
-      const speakerPayload = JSON.parse(
-        speakerReview.payload_json
-      ) as JsonObject;
-      const valueConflicts = IDIOM_REQUIRED_REVIEW_FIELDS.filter(
-        (field) =>
-          JSON.stringify(speakerPayload[field]) !==
-          JSON.stringify(payload[field])
+    const conflicts = detectSpeakerConflicts(speakerReview, payload, role);
+    if (conflicts) {
+      await setTaskPhase(c.env, taskId, "adjudication", now);
+      return c.json(
+        { conflicts, missing: [], reviewId, status: "needs_review" },
+        202
       );
-      if (valueConflicts.length > 0) {
-        await c.env.DATABASE.prepare(
-          "UPDATE izwa_tasks SET phase='adjudication', updated_at_ms=?2 WHERE task_id=?1"
-        )
-          .bind(taskId, now)
-          .run();
-        return c.json(
-          {
-            conflicts: valueConflicts,
-            missing: [],
-            reviewId,
-            status: "needs_review",
-          },
-          202
-        );
-      }
     }
 
-    const verifications = await c.env.DATABASE.prepare(
-      "SELECT field, reviewer_id, reviewer_role, verdict, basis, evidence_ids_json, reviewed_at_ms FROM izwa_field_verifications WHERE task_id=?1"
-    )
-      .bind(taskId)
-      .all<Record<string, unknown>>();
-    const reviewEvidence = (verifications.results ?? []).map((row) => ({
-      basis: String(row.basis),
-      evidenceIds: JSON.parse(String(row.evidence_ids_json || "[]")),
-      field: String(row.field),
-      reviewedAtMs: Number(row.reviewed_at_ms),
-      reviewerId: String(row.reviewer_id),
-      reviewerRole: String(row.reviewer_role),
-      verdict: String(row.verdict),
-    })) as Izwa.FieldVerification[];
+    const reviewEvidence = await loadReviewEvidence(c.env, taskId);
     const approval = validateIdiomApprovals(reviewEvidence);
     if (!approval.approved) {
-      await c.env.DATABASE.prepare(
-        "UPDATE izwa_tasks SET phase=?2, updated_at_ms=?3 WHERE task_id=?1"
-      )
-        .bind(
-          taskId,
-          approval.conflicts.length ? "adjudication" : "fluent_review",
-          now
-        )
-        .run();
+      await setTaskPhase(
+        c.env,
+        taskId,
+        approval.conflicts.length ? "adjudication" : "fluent_review",
+        now
+      );
       return c.json({ reviewId, status: "needs_review", ...approval }, 202);
     }
 
-    const validationPayload = { ...payload, review_evidence: reviewEvidence };
-    const violations = validateIdiomPayload(validationPayload);
-    if (violations.length > 0) {
-      return c.json({ error: "contract validation failed", violations }, 422);
+    const crystallized = await crystallizeIdiomReview(c.env, {
+      now,
+      payload,
+      reviewEvidence,
+      reviewerId,
+      task,
+      taskId,
+    });
+    if ("violations" in crystallized) {
+      return c.json(
+        { error: crystallized.error, violations: crystallized.violations },
+        422
+      );
     }
-    const recordId = newId("record_");
-    const quality = {
-      components: [{ name: "field_level_human_approval", score: 1, weight: 1 }],
-      humanRequired: true,
-      overall: 1,
-      satisfied: true,
-      threshold: 1,
-      unsatisfiedGates: [],
-    };
-    await c.env.DATABASE.batch([
-      c.env.DATABASE.prepare(
-        `INSERT INTO izwa_records
-         (record_id, task_id, contract_id, vertical, tenant, payload_json, quality_json,
-          verification_status, verified_by, model_versions_json, schema_version, provenance_json,
-          created_at_ms, export_status)
-         VALUES (?1, ?2, ?3, 'idiom-context', ?4, ?5, ?6, 'human_verified', ?7, '{}',
-          'idiom-context-v1', ?8, ?9, 'pending')`
-      ).bind(
-        recordId,
-        taskId,
-        IDIOM_CONTEXT_CONTRACT.contractId,
-        String(task.tenant),
-        JSON.stringify(validationPayload),
-        JSON.stringify(quality),
-        reviewerId,
-        JSON.stringify({
-          approvals: reviewEvidence.length,
-          sourceGroupId: task.source_group_id,
-        }),
-        now
-      ),
-      c.env.DATABASE.prepare(
-        "UPDATE izwa_field_verifications SET record_id=?2 WHERE task_id=?1"
-      ).bind(taskId, recordId),
-      c.env.DATABASE.prepare(
-        "UPDATE izwa_tasks SET status='crystallized', phase='resolved', updated_at_ms=?2 WHERE task_id=?1"
-      ).bind(taskId, now),
-      c.env.DATABASE.prepare(
-        "UPDATE izwa_escalations SET status='resolved', expert_id=?2, resolved_record_id=?3, resolved_at_ms=?4 WHERE task_id=?1"
-      ).bind(taskId, reviewerId, recordId, now),
-      c.env.DATABASE.prepare(
-        `INSERT INTO izwa_evidence_edges (edge_id, from_ref, to_ref, relationship, root_source_id, trust_tier, created_at_ms)
-         VALUES (?1, ?2, ?3, 'human_verified_derivation', ?4, 'human_verified', ?5)`
-      ).bind(
-        newId("edge_"),
-        String(task.asset_id),
-        recordId,
-        String(task.source_group_id || task.asset_id),
-        now
-      ),
-    ]);
     return c.json(
       {
-        recordId,
+        recordId: crystallized.recordId,
         reviewId,
         status: "crystallized",
         verificationStatus: "human_verified",

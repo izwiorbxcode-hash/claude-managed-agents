@@ -1,0 +1,16 @@
+{
+  "name": "izwa",
+  "short_name": "izwa",
+  "description": "African vernacular audio turned into human-corrected, community-reviewed learned data.",
+  "start_url": "/",
+  "display": "standalone",
+  "background_color": "#f6f8fc",
+  "theme_color": "#132235",
+  "icons": [
+    {
+      "src": "/brand/icon-512.png",
+      "sizes": "512x512",
+      "type": "image/png"
+    }
+  ]
+}

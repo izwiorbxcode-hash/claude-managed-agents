@@ -1,0 +1,49 @@
+{
+  "id": "izwa-community-speech",
+  "version": "v0.1",
+  "name": "Izwa Community Speech Understanding",
+  "status": "design",
+  "visibility": "private",
+  "vertical": "contextual-meaning",
+  "targetItemCount": 100,
+  "sourceTypes": [
+    "poem-or-song",
+    "speech-or-sermon",
+    "oral-history-or-story",
+    "conversation-or-voice-note",
+    "interview-or-podcast",
+    "lesson-or-professional-explanation"
+  ],
+  "requiredDimensions": [
+    "transcription",
+    "literal_meaning",
+    "intended_meaning",
+    "cultural_context",
+    "social_function",
+    "performance_cues",
+    "uncertainty_handling"
+  ],
+  "governance": {
+    "minIndependentReviewers": 2,
+    "minCommunityReviewers": 1,
+    "minLanguageReviewers": 1,
+    "adjudicatorRequiredForConflict": true,
+    "releaseThreshold": 0.75,
+    "requireSourceGroupIsolation": true
+  },
+  "releaseRequirements": {
+    "verificationCompletion": 1,
+    "rightsCleared": true,
+    "rawModelResponsesPreserved": true,
+    "speakerAndSourceGroupIsolation": true,
+    "paidCommunityReview": true,
+    "contributorPaymentsApproved": true,
+    "promptsFrozen": true,
+    "baselineOutputsFrozen": true,
+    "provenanceComplete": true,
+    "privacyReviewComplete": true,
+    "benchmarkCardComplete": true,
+    "unresolvedAdjudications": 0,
+    "immutableVersion": true
+  }
+}

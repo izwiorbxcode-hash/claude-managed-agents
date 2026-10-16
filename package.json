@@ -3,7 +3,7 @@
   "version": "0.1.0",
   "type": "module",
   "private": true,
-  "description": "IzwaAI — the learned-data layer for specialized intelligence, beginning with African languages",
+  "description": "Izwa — learned-data infrastructure and applied AI, beginning with Nguni languages",
   "packageManager": "bun@1.3.10",
   "workspaces": {
     "packages": [

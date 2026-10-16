@@ -1,8 +1,46 @@
-# Public access through language — product and commerce
+# Learned data and applied AI — product and commerce
 
-Izwa exists so a person can speak the language they know best and receive the same quality of help as someone speaking polished English. Accent, schooling, writing confidence, and ability to pay should not determine whether a system understands them.
+Izwa turns raw observations into verified datasets, specialised models, and
+deployable intelligence. African languages are the first vertical, beginning
+with separate, evidence-led work in siSwati, isiZulu, isiXhosa, and isiNdebele.
+The engine may propose transcripts and annotations; qualified people correct,
+contextualise, review, and adjudicate them.
 
-Izwa's core business is producing and licensing rich, human-verified datasets. African languages are the first vertical; the broader ambition is Learned Data Infrastructure for any domain where raw information must become dependable, reviewed, versioned data.
+The core business is a repeatable learned-data loop: collect for a defined
+purpose, verify with people, release a versioned dataset, adapt a specified
+model, evaluate independently, and use observed failures to improve the next
+dataset. Commercial outputs can include datasets, adapters, custom adaptation,
+evaluation, private deployments, and eventually hosted APIs. Each becomes a
+product only when Izwa can demonstrate its promised outcome.
+
+Public access through language remains an important application of this
+capability. A person should eventually be able to speak the language they know
+best and receive the same quality of help as someone speaking polished
+English. Accent, schooling, writing confidence, and ability to pay should not
+determine whether a system understands them. Public-service conversation is
+therefore an expansion domain, not the initial commercial wedge.
+
+## Contributor production model
+
+IzwaAI operates managed, funded batches. Each batch has a defined language,
+phenomenon, source-rights policy, contributor qualification, review plan,
+acceptance standard, budget, and delivery target.
+
+Contributor intake may be continental, but paid production and release happen in
+reviewable cohorts. IzwaAI does not publish an annotation merely because the
+engine generated it or a contributor submitted it; qualified independent review
+and the applicable quality contract determine release readiness.
+
+Creators explain intent. Language annotators correct and contextualise.
+Cultural contributors document community-scoped interpretations. Reviewers
+and adjudicators check the evidence. Evaluation contributors create and score
+tasks on held-out material. These roles may overlap for a qualified person,
+but approvals remain independent where the quality contract requires them.
+
+Payment for performed work remains separate from licensing or revenue sharing
+for source material. No submission silently grants unrestricted training,
+redistribution, or derivative-model rights. The accepted rights contract must
+travel with every dataset version and delivery entitlement.
 
 ## What the collection system must represent
 
@@ -45,7 +83,10 @@ Approvals remain separate even when one person has multiple qualifications:
 
 Language knowledge and government procedure are separate assets. Procedures carry authority, jurisdiction, effective dates, source, snapshot/hash, and verification time. Current answers must cite current procedure evidence; cultural knowledge must not silently inherit volatile administrative claims.
 
-The first field programme should choose one language and one public-service journey. Success measures are: Was the person understood? Did they understand the response? Was the next step correct? Was human help available when required?
+When IzwaAI expands into public-service language, the first field programme
+should choose one language and one service journey. Its success measures are:
+Was the person understood? Did they understand the response? Was the next step
+correct? Was human help available when required?
 
 ## Vocabulary development
 
@@ -65,11 +106,13 @@ Pronunciation, origin, examples, community scope, disagreement, and adaptation h
 |---|---|---|
 | Dataset licensing | Ready-made versioned releases | Paid licence by release and permitted use |
 | Commissioned datasets | Customer-defined collection and quality scope | Project fees and milestones; exclusivity separate |
-| Dataset subscriptions | New releases, corrections, and coverage | Recurring access agreement |
+| Adapter licensing | Task-specific weights and deployment documentation | Version licence and support |
+| Custom adaptation | Model improvement for an agreed task | Project fee with acceptance criteria |
 | Specialized editions | Speech, translation, humour, service conversation, evaluation | Packages or bundles |
 | Annotation/enrichment | Review of customer-owned data | Project or volume fees |
 | Evaluation/benchmarking | Native-speaker tests and private held-out sets | Assessment or recurring testing |
 | Private refinery deployment | Institution-operated production workflow | Setup, annual licence, support |
+| Hosted API | Managed access to a demonstrated capability | Usage or reserved capacity |
 | Sponsored datasets | Funded collection for approved public/research access | Sponsorship or funded contract |
 
 These are planned revenue models and target segments, not claims of secured customers, revenue, or traction.
@@ -86,8 +129,9 @@ Every delivery authenticates organization membership, checks an active entitleme
 
 ## Commercial delivery sequence
 
-1. **Sell one dataset:** immutable release → product/offer → verified payment → accepted licence → entitlement → delivery.
-2. **Sell production:** commissioned project → milestones → refinery tasks → acceptance → dataset delivery/invoice.
-3. **Add recurring access:** collection subscriptions, qualifying future releases, renewals, and deployment licences.
+1. **Prove one dataset:** one Nguni language and task → verified release → protected evaluation.
+2. **Prove one model intervention:** baseline → reproducible adaptation → independently measured improvement.
+3. **Sell one outcome:** licence or paid pilot → acceptance → entitlement or private delivery.
+4. **Add recurring access:** qualifying future releases, deployments, or hosted capability when demand and economics support them.
 
 The intended advantage is the combination of community participation, human-verified cultural meaning, traceable evidence, and a repeatable production system. Reuse always depends on contributor permissions and customer agreements.

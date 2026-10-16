@@ -2,21 +2,26 @@ import path from "node:path";
 import react from "@vitejs/plugin-react";
 import { defineConfig } from "vite";
 
-const repositoryRoot = path.resolve(__dirname, "../..");
+const repositoryRoot = path.resolve(import.meta.dirname, "../..");
 
 export default defineConfig({
-  publicDir: "static",
   build: {
-    outDir: "dist",
     emptyOutDir: true,
+    outDir: "dist",
     sourcemap: true,
   },
   plugins: [react()],
+  publicDir: "static",
+  resolve: {
+    alias: {
+      "@": path.resolve(import.meta.dirname, "src/src"),
+    },
+  },
   server: {
-    port: 5173,
     fs: {
       allow: [repositoryRoot],
     },
+    port: 5173,
     proxy: {
       "/api": "http://localhost:8787",
       "/webhooks": "http://localhost:8787",
@@ -24,11 +29,6 @@ export default defineConfig({
         target: "ws://localhost:8787",
         ws: true,
       },
-    },
-  },
-  resolve: {
-    alias: {
-      "@": path.resolve(__dirname, "src/src"),
     },
   },
 });

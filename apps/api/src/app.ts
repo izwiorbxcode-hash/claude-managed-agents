@@ -1,11 +1,14 @@
 import { Hono } from "hono";
 import { cors } from "hono/cors";
 import { logger } from "hono/logger";
+import { createAuth } from "./auth.js";
 import type { Env, Variables } from "./env.js";
-import { requestIdMiddleware } from "./middleware/requestId.js";
+import { requestIdMiddleware } from "./middleware/request-id.js";
+import { annotationRoutes } from "./routes/annotations.js";
 import { healthRoutes } from "./routes/health.js";
-import { izwaRoutes } from "./routes/izwa.js";
 import { idiomRoutes } from "./routes/idioms.js";
+import { izwaRoutes } from "./routes/izwa.js";
+import { openapiRoutes } from "./routes/openapi.js";
 import { projectsRoutes } from "./routes/projects.js";
 
 export const createApp = () => {
@@ -37,15 +40,20 @@ export const createApp = () => {
     })
   );
 
-  // Phase 2: mount Better Auth handler at /api/auth/* before session middleware
-  // app.on(["GET","POST","OPTIONS"], "/api/auth/*", (c) => createAuth(c.env, c.req.raw).handler(c.req.raw))
+  // Better Auth owns every /api/auth/* path. Mounted before the feature routes
+  // so no domain route can shadow it, and before any session middleware.
+  app.on(["GET", "POST", "OPTIONS"], "/api/auth/*", (c) =>
+    createAuth(c.env).handler(c.req.raw)
+  );
 
   app.route("/", healthRoutes);
   app.route("/", projectsRoutes);
   app.route("/", izwaRoutes);
+  app.route("/", openapiRoutes);
+  app.route("/", annotationRoutes);
   app.route("/", idiomRoutes);
 
-  app.get("/", (c) => c.text("IzwaAI API — OK"));
+  app.get("/", (c) => c.text("Izwa API — learned data infrastructure"));
 
   app.notFound((c) =>
     c.json(

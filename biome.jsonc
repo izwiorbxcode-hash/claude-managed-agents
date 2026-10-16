@@ -5,6 +5,9 @@
     "ultracite/biome/next",
     "ultracite/biome/react"
   ],
+  "files": {
+    "ignoreUnknown": true
+  },
   "overrides": [
     {
       "includes": ["apps/api/**", "packages/**"],
@@ -14,6 +17,18 @@
             "noUnusedImports": "warn"
           }
         }
+      }
+    },
+    {
+      "includes": ["**/static/**", "**/dist/**"],
+      "linter": {
+        "enabled": false
+      },
+      "formatter": {
+        "enabled": false
+      },
+      "assist": {
+        "enabled": false
       }
     }
   ]

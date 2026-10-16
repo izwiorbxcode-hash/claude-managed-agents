@@ -2,16 +2,22 @@
   "$schema": "node_modules/wrangler/config-schema.json",
   "name": "izwa-api",
   "main": "src/index.ts",
-  "compatibility_date": "2026-09-01",
+  "account_id": "9d5136534e7dcd94379c12ecca91ae2a",
+  "compatibility_date": "2026-08-18",
   "compatibility_flags": ["nodejs_compat"],
   "observability": { "enabled": true },
+  "assets": {
+    "directory": "../web/dist",
+    "binding": "ASSETS",
+    "not_found_handling": "single-page-application",
+    "run_worker_first": ["/api/*", "/health"]
+  },
   "d1_databases": [
     {
       "binding": "DATABASE",
       "database_name": "izwa-db",
-      "database_id": "00000000-0000-0000-0000-000000000000",
-      "migrations_dir": "../../packages/db/src/migrations",
-      "preview_database_id": "local"
+      "database_id": "9420ecfe-1f59-46f6-82a4-dc1b7df88e48",
+      "migrations_dir": "../../packages/db/src/migrations"
     }
   ],
   "r2_buckets": [
@@ -29,9 +35,26 @@
   "ai": {
     "binding": "AI"
   },
+  "queues": {
+    "producers": [
+      {
+        "binding": "JEV_ASSESSMENTS",
+        "queue": "izwa-jev-assessments"
+      }
+    ],
+    "consumers": [
+      {
+        "queue": "izwa-jev-assessments",
+        "max_batch_size": 5,
+        "max_batch_timeout": 5,
+        "max_retries": 3,
+        "dead_letter_queue": "izwa-jev-assessments-dlq"
+      }
+    ]
+  },
   "vars": {
-    "BETTER_AUTH_SECRET": "dev-secret-change-me-in-production-32chars",
-    "BETTER_AUTH_URL": "http://localhost:8787",
-    "CORS_ORIGIN": "http://localhost:3000"
+    "BETTER_AUTH_URL": "https://izwa-api.mkfixpro.workers.dev",
+    "CORS_ORIGIN": "https://izwa-api.mkfixpro.workers.dev",
+    "JEV_MODEL": "jev-latest"
   }
 }

@@ -1,13 +1,66 @@
 <!DOCTYPE html>
 <html lang="en">
-<head>
-  <meta charset="UTF-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <meta name="description" content="IzwaAI learned-data platform and developer documentation" />
-  <title>IzwaAI Platform</title>
-</head>
-<body>
-  <div id="root"></div>
-  <script type="module" src="/src/src/main.tsx"></script>
-</body>
+  <head>
+    <meta charset="UTF-8">
+    <meta content="width=device-width, initial-scale=1.0" name="viewport">
+
+    <title>izwa — Learned data. Deployable intelligence.</title>
+    <meta
+      content="Izwa turns raw observations into verified datasets, specialised models, and deployable intelligence—beginning with Nguni languages."
+      name="description"
+    >
+
+    <!-- Theme is resolved before React mounts so a dark-mode visitor never
+         sees a flash of the light theme. Keep the storage key in sync with
+         src/src/lib/theme.ts (THEME_STORAGE_KEY). -->
+    <script>
+    "use strict";
+    (() => {
+      let theme = "light";
+      try {
+        const stored = localStorage.getItem("izwa-theme");
+        if (stored === "dark" || stored === "light") {
+          theme = stored;
+        } else if (window.matchMedia("(prefers-color-scheme: dark)").matches) {
+          theme = "dark";
+        }
+      } catch {
+        // localStorage can throw in private mode; the light default stands.
+        theme = "light";
+      }
+      document.documentElement.dataset.theme = theme;
+    })();
+    </script>
+
+    <link href="/favicon-32.png" rel="icon" sizes="32x32" type="image/png">
+    <link href="/apple-touch-icon.png" rel="apple-touch-icon">
+    <link href="/site.webmanifest" rel="manifest">
+    <meta
+      content="#132235"
+      media="(prefers-color-scheme: dark)"
+      name="theme-color"
+    >
+    <meta
+      content="#f6f8fc"
+      media="(prefers-color-scheme: light)"
+      name="theme-color"
+    >
+
+    <meta content="website" property="og:type">
+    <meta content="izwa" property="og:site_name">
+    <meta
+      content="izwa — Learned data. Deployable intelligence."
+      property="og:title"
+    >
+    <meta
+      content="Verified datasets, specialised models, and deployable intelligence—beginning with Nguni languages."
+      property="og:description"
+    >
+    <meta content="/brand/logo.png" property="og:image">
+    <meta content="summary" name="twitter:card">
+  </head>
+  <body>
+    <div id="root"></div>
+    <script src="/src/src/main.tsx" type="module"></script>
+  </body>
 </html>

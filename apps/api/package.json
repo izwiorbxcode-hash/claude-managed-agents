@@ -15,18 +15,20 @@
     "clean": "rm -rf dist .wrangler"
   },
   "dependencies": {
+    "@better-auth/drizzle-adapter": "catalog:",
+    "@izwa/annotation": "workspace:*",
+    "@izwa/datasets": "workspace:*",
+    "@izwa/embeddings": "workspace:*",
+    "@izwa/evaluation": "workspace:*",
+    "@izwa/taxonomy": "workspace:*",
     "@unsung/db": "workspace:*",
     "@unsung/domain": "workspace:*",
-    "@unsung/validation": "workspace:*",
     "@unsung/effect": "workspace:*",
-    "@izwa/taxonomy": "workspace:*",
-    "@izwa/datasets": "workspace:*",
-    "@izwa/evaluation": "workspace:*",
-    "@izwa/embeddings": "workspace:*",
-    "@izwa/annotation": "workspace:*",
+    "@unsung/validation": "workspace:*",
+    "better-auth": "catalog:",
+    "drizzle-orm": "catalog:",
     "effect": "catalog:",
     "hono": "catalog:",
-    "drizzle-orm": "catalog:",
     "zod": "catalog:"
   },
   "devDependencies": {

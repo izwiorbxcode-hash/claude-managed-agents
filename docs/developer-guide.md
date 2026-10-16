@@ -1,68 +1,131 @@
-# IzwaAI Developer Guide
+# Izwa developer guide
 
 ## Prerequisites
 
-- Bun 1.3 or newer (the repository pins its package manager in `package.json`)
-- A Cloudflare account and Wrangler login for Worker development or deployment
-- Python/GPU tooling only when working inside `ml/`
+- Bun matching the root `packageManager` field
+- Wrangler authenticated to the intended Cloudflare account
+- Access to configured remote resources for deployment or remote integration
+  testing
 
-## First run
+## Install and verify
 
 ```sh
 bun install
-cp .env.example .env
 bun run typecheck
 bun run test
+bun run build
 ```
 
-Start the API and web app in separate terminals:
+The monorepo uses Turborepo. Run a focused app when possible during iteration:
+
+```sh
+bun run dev:api
+bun run dev:web
+bun --cwd apps/api test
+bun --cwd apps/api run check-types
+```
+
+## Local full-stack development
+
+The API Worker is canonical. It owns `/api/*` and can serve the built SPA from
+`apps/web/dist`.
+
+```sh
+bun run build:web
+bunx wrangler dev --cwd apps/api
+```
+
+For faster UI iteration, run the Vite app separately. Its development proxy
+forwards API calls to the local API process.
 
 ```sh
 bun run dev:api
 bun run dev:web
 ```
 
-The API listens on `http://localhost:8787`; Vite listens on `http://localhost:5173` and proxies `/api`, `/webhooks`, and `/ws` to the API.
+## Repository rules
 
-## Common commands
+- Put Izwa domain logic in `packages/domain/src/izwa` or the relevant
+  specialised package.
+- Keep request parsing and HTTP status selection in `apps/api`.
+- Keep D1 migrations in `packages/db/src/migrations`.
+- Keep original assets immutable; write derivatives under distinct keys.
+- Make background jobs idempotent and reference immutable input versions.
+- Treat model confidence as routing evidence, never human verification.
+- Do not add new features to `legacy/sandbox`.
 
-| Command | Purpose |
-|---|---|
-| `bun run dev` | Run all package development tasks through Turbo |
-| `bun run build` | Build every package according to the dependency graph |
-| `bun run build:web` | Build only `@izwa/web` into `apps/web/dist` |
-| `bun run typecheck` | Type-check all workspaces |
-| `bun run test` | Run workspace tests |
-| `bun run lint` | Run Ultracite/Biome checks |
-| `bun run db:migrate` | Apply canonical API D1 migrations locally |
-| `bun run cf-typegen` | Regenerate API Worker binding types |
+## Adding an API feature
 
-Run `bunx wrangler types --cwd apps/api` after changing bindings in `apps/api/wrangler.jsonc`.
+1. Define or reuse a domain contract.
+2. Add persistence through the canonical D1 schema and migration when needed.
+3. Add the Hono route under `apps/api/src/routes`.
+4. Return a structured success or error response with an appropriate status.
+5. Add route tests using `app.request()`.
+6. Add the endpoint to `apps/api/src/routes/openapi.ts`.
+7. Update the web client only after the server contract is stable.
+8. Run API tests, workspace type checks, and the production build.
 
-## Idiom production path
+After changing `apps/api/wrangler.jsonc` bindings, regenerate types:
 
-1. Upload consented `audio/*` bytes to `PUT /api/izwa/media/:key` with `x-izwa-consent`.
-2. Call `POST /api/izwa/media/:assetId/transcribe` for timestamped Workers AI transcription.
-3. Mark the expression and context with `POST /api/izwa/idioms/tasks`.
-4. Complete speaker and independent fluent reviews at `/idiom-review`.
-5. Create a dataset, then publish an immutable version using one of the supported product projections.
+```sh
+bunx wrangler types --cwd apps/api
+```
 
-Reviewer identity currently comes from `x-user-id` while the Better Auth integration remains a scaffold. Do not expose mutation routes publicly until authenticated sessions and role checks replace this development identity seam.
+## Current learned-data path
 
-## Adding a feature
+The implemented thin slice includes:
 
-1. Put business rules and schemas in `packages/domain` or the relevant `@izwa/*` package.
-2. Add an infrastructure adapter in `packages/db`, `packages/storage`, or `packages/cloudflare`.
-3. Compose it per request in `apps/api`; never keep Cloudflare I/O objects in module-global state.
-4. Expose a narrow Hono route and a shared client contract.
-5. Add UI behavior to the appropriate app.
-6. Test pure domain logic first, then adapters and Worker integration.
-7. Update the relevant document and an ADR when the architectural decision is durable.
+1. uploading a permitted audio source;
+2. creating a draft transcript;
+3. preserving transcript corrections;
+4. creating passages and model-assessment jobs;
+5. collecting meaning annotations and reviews;
+6. creating protected evaluation cases;
+7. creating dataset containers; and
+8. constructing an immutable dataset version from eligible records.
 
-## Adding documentation
+The current idiom/context routes are one vertical slice. New language tasks
+should extend the general LDU model rather than copying an idiom-specific silo.
 
-Markdown source lives in `docs/`. To show a page inside the web app, import it and add its metadata to `apps/web/src/src/views/docs/registry.ts`. The registry order controls the sidebar and previous/next navigation.
+## Database changes
 
-## Known transition
+Generate and inspect migrations before applying them. Local and remote targets
+are separate operations.
 
-This repository evolved from a Cloudflare Claude Managed Agents template. The maintained system lives under `apps/`, `packages/`, and `workers/`; the old implementation is archived at `legacy/sandbox/`. Do not add new product behavior to root legacy files.
+```sh
+bun run db:generate
+bun run db:migrate
+bunx wrangler d1 migrations apply izwa-db --remote --cwd apps/api
+```
+
+Never assume an application deployment applied D1 migrations.
+
+## Validation before deployment
+
+```sh
+bun --cwd apps/api run build
+bun --cwd apps/api test
+bun run typecheck
+bun run build
+```
+
+Then deploy and verify at least:
+
+- `/`
+- `/api/health`
+- `/api/izwa`
+- `/api/izwa/languages`
+- `/api/izwa/capabilities`
+- `/api/openapi.json`
+- `/redoc`
+
+## Documentation changes
+
+Company direction changes begin in `docs/vision.md`. Product implications go
+in `docs/product-guide.md` and `docs/mission-commerce.md`. Runtime ownership
+belongs in `docs/system-map.md`; commands and release steps belong here or in
+`docs/web-deployment.md`.
+
+Do not duplicate the entire vision into every file. Link to the authoritative
+document and document only the local concern.
+

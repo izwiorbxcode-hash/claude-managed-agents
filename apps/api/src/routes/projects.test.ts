@@ -11,11 +11,14 @@ const makeMockDb = (): DrizzleDb => {
   const rows: ProjectRow[] = [];
   return {
     insert: (..._args: unknown[]) => ({
-      values: async (row: ProjectRow): Promise<void> => {
+      values: (row: ProjectRow): Promise<void> => {
         if (rows.some((r: ProjectRow) => r.slug === row.slug)) {
-          throw new Error("UNIQUE constraint failed: projects.slug");
+          return Promise.reject(
+            new Error("UNIQUE constraint failed: projects.slug")
+          );
         }
         rows.push(row);
+        return Promise.resolve();
       },
     }),
     select: (..._args: unknown[]) => ({

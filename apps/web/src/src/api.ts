@@ -1,13 +1,14 @@
 // Thin API client. Returns parsed JSON or throws on non-2xx.
 
 export class ApiError extends Error {
-  constructor(
-    public status: number,
-    public body: unknown,
-    message: string,
-  ) {
+  readonly body: unknown;
+  readonly status: number;
+
+  constructor(status: number, body: unknown, message: string) {
     super(message);
     this.name = "ApiError";
+    this.status = status;
+    this.body = body;
   }
 }
 
@@ -36,7 +37,127 @@ async function request<T>(path: string, init?: RequestInit): Promise<T> {
   return body as T;
 }
 
+export interface HealthResponse {
+  requestId: string;
+  status: "ok";
+  success: true;
+  timestamp: string;
+}
+
+export interface UploadResult {
+  assetId: string;
+  duplicate?: boolean;
+  r2Key: string;
+  sizeBytes: number;
+  sourceGroupId: string;
+  status: "uploaded";
+}
+
+export interface AnnotationDraft {
+  alternativeReadings: string;
+  context: string;
+  culturalMeaning: string;
+  intendedMeaning: string;
+  literalMeaning: string;
+  socialFunction: string;
+  uncertainty: string;
+}
+
+const safeMediaKey = (name: string): string => {
+  const normalized = name.replaceAll(/[^A-Za-z0-9._-]/g, "-");
+  return normalized.slice(0, 180) || `recording-${Date.now()}.audio`;
+};
+
+export const richAudioApi = {
+  correctTranscript: (assetId: string, transcript: string) =>
+    request<{ assetId: string; status: string; transcript: string }>(
+      `/api/izwa/media/${encodeURIComponent(assetId)}/transcript`,
+      {
+        body: JSON.stringify({ transcript }),
+        headers: {
+          "content-type": "application/json",
+          "x-user-id": "web-contributor",
+        },
+        method: "PATCH",
+      }
+    ),
+  createMeaningTask: ({
+    assetId,
+    draft,
+    transcript,
+  }: {
+    assetId: string;
+    draft: AnnotationDraft;
+    transcript: string;
+  }) =>
+    request<{ escalationId: string; status: string; taskId: string }>(
+      "/api/izwa/idioms/tasks",
+      {
+        body: JSON.stringify({
+          alternative_readings: draft.alternativeReadings
+            ? [draft.alternativeReadings]
+            : [],
+          assetId,
+          context: [draft.context, draft.culturalMeaning]
+            .filter(Boolean)
+            .join("\n\n"),
+          expression_span: { end_ms: 0, start_ms: 0, text: transcript },
+          intended_meaning: draft.intendedMeaning,
+          literal_meaning: draft.literalMeaning,
+          social_function: draft.socialFunction
+            .split(",")
+            .map((value) => value.trim())
+            .filter(Boolean),
+          transcript,
+          uncertainty: draft.uncertainty,
+        }),
+        headers: {
+          "content-type": "application/json",
+          "x-user-id": "web-contributor",
+        },
+        method: "POST",
+      }
+    ),
+  health: () => request<HealthResponse>("/api/health"),
+  transcribe: (assetId: string) =>
+    request<{
+      assetId: string;
+      segmentId: string;
+      status: string;
+      transcript: string;
+      vtt: string;
+    }>(`/api/izwa/media/${encodeURIComponent(assetId)}/transcribe`, {
+      method: "POST",
+    }),
+  upload: (file: File, metadata: { language: string; sourceType: string }) =>
+    request<UploadResult>(
+      `/api/izwa/media/${encodeURIComponent(safeMediaKey(file.name))}`,
+      {
+        body: file,
+        headers: {
+          "content-type": file.type || "audio/mpeg",
+          "x-izwa-consent": JSON.stringify({
+            language: metadata.language,
+            permittedUses: ["transcription", "annotation", "community_review"],
+            sourceType: metadata.sourceType,
+            version: "contribution-v1",
+          }),
+          "x-user-id": "web-contributor",
+        },
+        method: "PUT",
+      }
+    ),
+};
+
 export interface ConfigCapabilities {
+  browserRendering: boolean;
+  emailInbox: boolean;
+  emailSend: boolean;
+  // True when at least one persisted agent uses the MicroVM backend (or
+  // no agents exist yet — `microvm` is the default). Lets the dashboard
+  // hide the snapshots warning on Isolate-only deployments. Optional so
+  // older worker deploys still parse.
+  hasMicrovmAgents?: boolean;
   // Whether MicroVM `/workspace` snapshots are being persisted. False
   // when the BACKUP_BUCKET R2 binding is absent, which means container
   // hibernation will silently lose state.
@@ -46,24 +167,16 @@ export interface ConfigCapabilities {
   // is the dev fallback that talks to the R2 binding directly; "disabled"
   // means no binding at all.
   snapshotsMode: "presigned" | "localBucket" | "disabled";
-  browserRendering: boolean;
   workersAi: boolean;
-  emailSend: boolean;
-  emailInbox: boolean;
-  // True when at least one persisted agent uses the MicroVM backend (or
-  // no agents exist yet — `microvm` is the default). Lets the dashboard
-  // hide the snapshots warning on Isolate-only deployments. Optional so
-  // older worker deploys still parse.
-  hasMicrovmAgents?: boolean;
 }
 
 export interface ConfigResponse {
-  environmentId: string | null;
   anthropicBaseURL: string;
-  missing: string[];
   // Optional so older worker deploys still parse — frontend code that
   // reads these flags should fall back to `undefined`-tolerant logic.
   capabilities?: ConfigCapabilities;
+  environmentId: string | null;
+  missing: string[];
 }
 
 // Backend identifier persisted on each agent.
@@ -76,75 +189,75 @@ export type AgentBackend = "microvm" | "isolate";
 // `requires` are only set for binding-gated tools so the form can
 // disable / hint accordingly.
 export interface ToolCatalogEntry {
-  name: string;
-  displayName: string;
-  description: string;
   available?: boolean;
-  requires?: string | null;
+  description: string;
+  displayName: string;
   // Set on `isolatePower` entries that the MicroVM backend can also
   // host (browser CDP tools today). Used by the agent form to surface
   // these in the MicroVM tool catalog alongside cf_* tools.
   microvmEligible?: boolean;
+  name: string;
+  requires?: string | null;
 }
 
 export interface ToolCatalogResponse {
-  microvmStock: ToolCatalogEntry[];
-  serverSide: ToolCatalogEntry[];
-  isolateWorkspace: ToolCatalogEntry[];
-  isolatePower: ToolCatalogEntry[];
   cfTools: ToolCatalogEntry[];
   custom: ToolCatalogEntry[];
+  isolatePower: ToolCatalogEntry[];
+  isolateWorkspace: ToolCatalogEntry[];
+  microvmStock: ToolCatalogEntry[];
+  serverSide: ToolCatalogEntry[];
 }
 
 // Workspace file/directory entry returned by the Isolate Sandbox browse
 // endpoints. Mirrors the `FileInfo` shape the control plane DO marshals across the
 // RPC boundary — kept as a plain object so the wire format stays trivial.
 export interface WorkspaceEntry {
-  path: string;
-  name: string;
-  type: "file" | "directory" | "symlink";
-  mimeType: string;
-  size: number;
   createdAt: number;
+  mimeType: string;
+  name: string;
+  path: string;
+  size: number;
+  type: "file" | "directory" | "symlink";
   updatedAt: number;
 }
 
 export interface SessionRecord {
-  sessionId: string;
+  backend?: AgentBackend;
+  containerStatus?: string;
   createdAt: string;
   lastWebhookAt: string;
   lastWebhookType: string;
-  containerStatus?: string;
-  backend?: AgentBackend;
+  sessionId: string;
 }
 
 export interface SessionPage {
   items: SessionRecord[];
-  total: number;
-  page: number;
   limit: number;
+  page: number;
   pages: number;
+  total: number;
 }
 
 export interface WebhookEvent {
-  type: "event";
-  id: string;
   // Anthropic uses `created_at`; older payloads used `timestamp`. We surface
   // whichever one is set in the event.
   created_at?: string;
-  timestamp?: string;
   data: {
     type: string;
     id: string;
     organization_id?: string;
     workspace_id?: string;
   };
+  id: string;
+  timestamp?: string;
+  type: "event";
 }
 
 export interface WebhookEventPage {
-  items: WebhookEvent[];
   cursor: string | null;
   hasMore: boolean;
+  items: WebhookEvent[];
 }
 
 export interface SecretItem {
@@ -153,17 +266,17 @@ export interface SecretItem {
 }
 
 export interface EgressPolicy {
-  id: string;
-  name: string;
-  egressRules: EgressRule[];
-  applyTo: ApplyToMatcher[];
   // Catch-all flag — when true, this policy applies to every sandbox.
   // Mutually exclusive with `applyTo`; the form prevents combining them.
   appliesToAll?: boolean;
+  applyTo: ApplyToMatcher[];
+  createdAt: string;
+  egressRules: EgressRule[];
+  id: string;
+  name: string;
   // Legacy field kept optional for back-compat with stored policies. The UI
   // no longer reads or writes this.
   sessionIds?: string[];
-  createdAt: string;
   updatedAt: string;
 }
 
@@ -188,124 +301,36 @@ export interface ApplyToMatcher {
 
 export interface VpcBinding {
   binding: string;
-  type: "network" | "service";
-  id: string;
   description?: string;
+  id: string;
+  type: "network" | "service";
 }
 
 export interface VpcResponse {
-  items: VpcBinding[];
   docsUrl: string;
+  items: VpcBinding[];
 }
 
 export const api = {
-  config: () => request<ConfigResponse>("/api/config"),
-
-  // Sandboxes / sessions tracked by webhook ingestion.
-  environments: (page: number, limit: number) =>
-    request<SessionPage>(`/api/environments?page=${page}&limit=${limit}`),
-  environmentStatus: (sessionId: string) =>
-    request<{
-      sessionId: string;
-      containerStatus: string;
-      backend?: AgentBackend;
-    }>(`/api/environments/${encodeURIComponent(sessionId)}/status`),
-  drainEnvironments: () =>
-    request<{ status: string; spawned: unknown[] }>("/api/environments/drain", {
-      method: "POST",
-    }),
-  stopEnvironment: (sessionId: string) =>
-    request<{ sessionId: string; status: string }>(
-      `/api/environments/${encodeURIComponent(sessionId)}/stop`,
-      { method: "POST" },
+  agent: (id: string) => request<AnthropicAgent>(`/api/agents/${id}`),
+  agentBackend: (id: string) =>
+    request<{ agentId: string; backend: AgentBackend }>(
+      `/api/agents/${encodeURIComponent(id)}/backend`
     ),
 
-  // Workspace browser (Isolate Sandbox only). MicroVM sessions return 409.
-  workspaceList: (sessionId: string, path = "/") =>
-    request<{ path: string; entries: WorkspaceEntry[] }>(
-      `/api/environments/${encodeURIComponent(sessionId)}/workspace?path=${encodeURIComponent(path)}`,
-    ),
-  workspaceFile: (sessionId: string, path: string) =>
-    request<{ entry: WorkspaceEntry; content: string }>(
-      `/api/environments/${encodeURIComponent(sessionId)}/workspace/file?path=${encodeURIComponent(path)}`,
-    ),
-  workspaceInfo: (sessionId: string) =>
-    request<{
-      fileCount: number;
-      directoryCount: number;
-      totalBytes: number;
-      r2FileCount: number;
-    }>(`/api/environments/${encodeURIComponent(sessionId)}/workspace/info`),
-
-  // Webhook events
-  webhookEvents: (cursor?: string | null, limit = 50) => {
-    const qs = new URLSearchParams({ limit: String(limit) });
-    if (cursor) qs.set("cursor", cursor);
-    return request<WebhookEventPage>(`/api/webhook-events?${qs}`);
-  },
-  webhookEvent: (eventId: string) =>
-    request<WebhookEvent>(`/api/webhook-events/${encodeURIComponent(eventId)}`),
+  // Anthropic-proxied APIs
+  agents: () => request<{ data: AnthropicAgent[] }>("/api/agents"),
+  archiveSession: (id: string) =>
+    request<unknown>(`/api/sessions/${id}/archive`, { method: "POST" }),
   clearWebhookEvents: () =>
     request<{ deleted: number }>("/api/webhook-events", { method: "DELETE" }),
-
-  // Secrets
-  listSecrets: (cursor?: string | null) => {
-    const qs = new URLSearchParams({ limit: "100" });
-    if (cursor) qs.set("cursor", cursor);
-    return request<{
-      items: SecretItem[];
-      cursor: string | null;
-      hasMore: boolean;
-    }>(`/api/secrets?${qs}`);
-  },
-  putSecret: (key: string, value: string) =>
-    request<{ key: string; status: string }>(
-      `/api/secrets/${encodeURIComponent(key)}`,
-      {
-        method: "PUT",
-        headers: { "content-type": "application/json" },
-        body: JSON.stringify({ value }),
-      },
-    ),
-  deleteSecret: (key: string) =>
-    request<{ key: string; status: string }>(
-      `/api/secrets/${encodeURIComponent(key)}`,
-      { method: "DELETE" },
-    ),
-
-  // Egress policies
-  listPolicies: () =>
-    request<{ items: EgressPolicy[] }>("/api/egress-policies"),
-  policyDataFields: () =>
-    request<{ items: string[] }>("/api/egress-policies/data-fields"),
-  getPolicy: (id: string) =>
-    request<EgressPolicy>(`/api/egress-policies/${encodeURIComponent(id)}`),
-  savePolicy: (policy: EgressPolicy) =>
-    request<EgressPolicy>(
-      `/api/egress-policies/${encodeURIComponent(policy.id)}`,
-      {
-        method: "PUT",
-        headers: { "content-type": "application/json" },
-        body: JSON.stringify(policy),
-      },
-    ),
-  deletePolicy: (id: string) =>
-    request<{ id: string; status: string }>(
-      `/api/egress-policies/${encodeURIComponent(id)}`,
-      { method: "DELETE" },
-    ),
-
-  // VPC + Mesh
-  vpc: () => request<VpcResponse>("/api/vpc"),
-
-  // Isolate Sandbox defaults (recommended system prompt, etc).
-  isolateDefaults: () =>
-    request<{ systemPrompt: string }>("/api/isolate/defaults"),
-  // MicroVM Sandbox defaults — analogous to isolateDefaults but covers
-  // the container backend's quirks (shell, $ANTHROPIC_SESSION_ID env
-  // var, /workspace persistence).
-  microvmDefaults: () =>
-    request<{ systemPrompt: string }>("/api/microvm/defaults"),
+  config: () => request<ConfigResponse>("/api/config"),
+  createSession: (body: unknown) =>
+    request<AnthropicSession>("/api/sessions", {
+      body: JSON.stringify(body),
+      headers: { "content-type": "application/json" },
+      method: "POST",
+    }),
   // User-defined custom tools — pulled at runtime from src/tools/custom-tools.ts.
   // `available` reflects whether the tool's `requires` predicate
   // currently passes against the deployed env so we can grey out
@@ -314,6 +339,105 @@ export const api = {
     request<{
       tools: Array<{ name: string; description: string; available: boolean }>;
     }>("/api/custom-tools"),
+  deletePolicy: (id: string) =>
+    request<{ id: string; status: string }>(
+      `/api/egress-policies/${encodeURIComponent(id)}`,
+      { method: "DELETE" }
+    ),
+  deleteSecret: (key: string) =>
+    request<{ key: string; status: string }>(
+      `/api/secrets/${encodeURIComponent(key)}`,
+      { method: "DELETE" }
+    ),
+  drainEnvironments: () =>
+    request<{ status: string; spawned: unknown[] }>("/api/environments/drain", {
+      method: "POST",
+    }),
+  environmentStatus: (sessionId: string) =>
+    request<{
+      sessionId: string;
+      containerStatus: string;
+      backend?: AgentBackend;
+    }>(`/api/environments/${encodeURIComponent(sessionId)}/status`),
+
+  // Sandboxes / sessions tracked by webhook ingestion.
+  environments: (page: number, limit: number) =>
+    request<SessionPage>(`/api/environments?page=${page}&limit=${limit}`),
+  getPolicy: (id: string) =>
+    request<EgressPolicy>(`/api/egress-policies/${encodeURIComponent(id)}`),
+
+  // Isolate Sandbox defaults (recommended system prompt, etc).
+  isolateDefaults: () =>
+    request<{ systemPrompt: string }>("/api/isolate/defaults"),
+
+  // Egress policies
+  listPolicies: () =>
+    request<{ items: EgressPolicy[] }>("/api/egress-policies"),
+
+  // Secrets
+  listSecrets: (cursor?: string | null) => {
+    const qs = new URLSearchParams({ limit: "100" });
+    if (cursor) {
+      qs.set("cursor", cursor);
+    }
+    return request<{
+      items: SecretItem[];
+      cursor: string | null;
+      hasMore: boolean;
+    }>(`/api/secrets?${qs}`);
+  },
+  // MicroVM Sandbox defaults — analogous to isolateDefaults but covers
+  // the container backend's quirks (shell, $ANTHROPIC_SESSION_ID env
+  // var, /workspace persistence).
+  microvmDefaults: () =>
+    request<{ systemPrompt: string }>("/api/microvm/defaults"),
+  policyDataFields: () =>
+    request<{ items: string[] }>("/api/egress-policies/data-fields"),
+  putSecret: (key: string, value: string) =>
+    request<{ key: string; status: string }>(
+      `/api/secrets/${encodeURIComponent(key)}`,
+      {
+        body: JSON.stringify({ value }),
+        headers: { "content-type": "application/json" },
+        method: "PUT",
+      }
+    ),
+  saveAgent: (id: string | null, body: unknown) =>
+    request<AnthropicAgent>(id ? `/api/agents/${id}` : "/api/agents", {
+      body: JSON.stringify(body),
+      headers: { "content-type": "application/json" },
+      method: "POST",
+    }),
+  savePolicy: (policy: EgressPolicy) =>
+    request<EgressPolicy>(
+      `/api/egress-policies/${encodeURIComponent(policy.id)}`,
+      {
+        body: JSON.stringify(policy),
+        headers: { "content-type": "application/json" },
+        method: "PUT",
+      }
+    ),
+  sendSessionMessage: (id: string, text: string) =>
+    request<unknown>(`/api/sessions/${id}/events`, {
+      body: JSON.stringify({
+        events: [{ content: [{ text, type: "text" }], type: "user.message" }],
+      }),
+      headers: { "content-type": "application/json" },
+      method: "POST",
+    }),
+  session: (id: string) => request<AnthropicSession>(`/api/sessions/${id}`),
+  sessionEvents: (id: string) =>
+    request<{ data: AnthropicEvent[] }>(`/api/sessions/${id}/events`),
+
+  sessions: (backend?: AgentBackend) => {
+    const qs = backend ? `?backend=${encodeURIComponent(backend)}` : "";
+    return request<{ data: AnthropicSession[] }>(`/api/sessions${qs}`);
+  },
+  stopEnvironment: (sessionId: string) =>
+    request<{ sessionId: string; status: string }>(
+      `/api/environments/${encodeURIComponent(sessionId)}/stop`,
+      { method: "POST" }
+    ),
 
   // Full agent tool catalog. Single source of truth for the checkbox
   // grid in the agent form — backend changes (new cf_* tool, new
@@ -323,59 +447,52 @@ export const api = {
   // checkbox is disabled.
   toolCatalog: () => request<ToolCatalogResponse>("/api/tool-catalog"),
 
-  // Anthropic-proxied APIs
-  agents: () => request<{ data: AnthropicAgent[] }>("/api/agents"),
-  agent: (id: string) => request<AnthropicAgent>(`/api/agents/${id}`),
-  agentBackend: (id: string) =>
-    request<{ agentId: string; backend: AgentBackend }>(
-      `/api/agents/${encodeURIComponent(id)}/backend`,
-    ),
-  saveAgent: (id: string | null, body: unknown) =>
-    request<AnthropicAgent>(id ? `/api/agents/${id}` : "/api/agents", {
-      method: "POST",
-      headers: { "content-type": "application/json" },
-      body: JSON.stringify(body),
-    }),
+  // VPC + Mesh
+  vpc: () => request<VpcResponse>("/api/vpc"),
+  webhookEvent: (eventId: string) =>
+    request<WebhookEvent>(`/api/webhook-events/${encodeURIComponent(eventId)}`),
 
-  sessions: (backend?: AgentBackend) => {
-    const qs = backend ? `?backend=${encodeURIComponent(backend)}` : "";
-    return request<{ data: AnthropicSession[] }>(`/api/sessions${qs}`);
+  // Webhook events
+  webhookEvents: (cursor?: string | null, limit = 50) => {
+    const qs = new URLSearchParams({ limit: String(limit) });
+    if (cursor) {
+      qs.set("cursor", cursor);
+    }
+    return request<WebhookEventPage>(`/api/webhook-events?${qs}`);
   },
-  session: (id: string) => request<AnthropicSession>(`/api/sessions/${id}`),
-  createSession: (body: unknown) =>
-    request<AnthropicSession>("/api/sessions", {
-      method: "POST",
-      headers: { "content-type": "application/json" },
-      body: JSON.stringify(body),
-    }),
-  sessionEvents: (id: string) =>
-    request<{ data: AnthropicEvent[] }>(`/api/sessions/${id}/events`),
-  sendSessionMessage: (id: string, text: string) =>
-    request<unknown>(`/api/sessions/${id}/events`, {
-      method: "POST",
-      headers: { "content-type": "application/json" },
-      body: JSON.stringify({
-        events: [{ type: "user.message", content: [{ type: "text", text }] }],
-      }),
-    }),
-  archiveSession: (id: string) =>
-    request<unknown>(`/api/sessions/${id}/archive`, { method: "POST" }),
+  workspaceFile: (sessionId: string, path: string) =>
+    request<{ entry: WorkspaceEntry; content: string }>(
+      `/api/environments/${encodeURIComponent(sessionId)}/workspace/file?path=${encodeURIComponent(path)}`
+    ),
+  workspaceInfo: (sessionId: string) =>
+    request<{
+      fileCount: number;
+      directoryCount: number;
+      totalBytes: number;
+      r2FileCount: number;
+    }>(`/api/environments/${encodeURIComponent(sessionId)}/workspace/info`),
+
+  // Workspace browser (Isolate Sandbox only). MicroVM sessions return 409.
+  workspaceList: (sessionId: string, path = "/") =>
+    request<{ path: string; entries: WorkspaceEntry[] }>(
+      `/api/environments/${encodeURIComponent(sessionId)}/workspace?path=${encodeURIComponent(path)}`
+    ),
 };
 
 export interface IdiomReviewItem {
-  taskId: string;
   assetId: string;
+  blind: boolean;
   escalationId: string;
+  machineSuggestions: unknown;
   phase: "speaker_review" | "fluent_review" | "adjudication";
-  transcript: string;
-  sourceGroupId: string;
   seed: {
     expression_span?: { text?: string; start_ms?: number; end_ms?: number };
     context?: string;
     transcript?: string;
   } | null;
-  machineSuggestions: unknown;
-  blind: boolean;
+  sourceGroupId: string;
+  taskId: string;
+  transcript: string;
 }
 
 export const idiomApi = {
@@ -384,28 +501,32 @@ export const idiomApi = {
       headers: { authorization: `Bearer ${reviewerToken}` },
     }),
   submit: (reviewerToken: string, taskId: string, body: unknown) =>
-    request<{ status: string; recordId?: string; missing?: string[]; conflicts?: string[] }>(
-      `/api/izwa/idioms/tasks/${encodeURIComponent(taskId)}/reviews`,
-      {
-        method: "POST",
-        headers: {
-          authorization: `Bearer ${reviewerToken}`,
-          "content-type": "application/json",
-        },
-        body: JSON.stringify(body),
+    request<{
+      status: string;
+      recordId?: string;
+      missing?: string[];
+      conflicts?: string[];
+    }>(`/api/izwa/idioms/tasks/${encodeURIComponent(taskId)}/reviews`, {
+      body: JSON.stringify(body),
+      headers: {
+        authorization: `Bearer ${reviewerToken}`,
+        "content-type": "application/json",
       },
-    ),
+      method: "POST",
+    }),
 };
 
 export interface AnthropicAgent {
+  // Local addition — populated by /api/agents and /api/agents/:id from the
+  // agent_backends D1 table. Defaults to "microvm" when no row is present.
+  backend?: AgentBackend;
   id: string;
-  name: string;
   // The managed-agents beta started returning `model` as an object
   // (`{id, speed}`) where it used to be a plain string. We keep the
   // union so older fixtures and any future fallback still type-check,
   // but `modelId()` in utils.ts should be used at every render site.
   model: string | { id: string; speed?: string };
-  version: string;
+  name: string;
   system?: string;
   tools?: Array<{
     type?: string;
@@ -424,15 +545,10 @@ export interface AnthropicAgent {
     // selection.
     mcp_server_name?: string;
   }>;
-  // Local addition — populated by /api/agents and /api/agents/:id from the
-  // agent_backends D1 table. Defaults to "microvm" when no row is present.
-  backend?: AgentBackend;
+  version: string;
 }
 
 export interface AnthropicSession {
-  id: string;
-  title?: string;
-  status: string;
   // Anthropic returns the resolved agent under a nested `agent` object
   // (snapshot at session-creation time). The frontend reads `agent.id`
   // when linking from a session back to its agent.
@@ -441,11 +557,14 @@ export interface AnthropicSession {
     name?: string;
     version?: number;
   };
-  created_at?: string;
-  updated_at?: string;
   // Surfaced by the worker — joined from the local sessions table on the
   // way out. Falls back to "microvm" when no cached backend is known yet.
   backend?: AgentBackend;
+  created_at?: string;
+  id: string;
+  status: string;
+  title?: string;
+  updated_at?: string;
 }
 
 // Tool-use / tool-result blocks can appear either as the event's own
@@ -455,8 +574,6 @@ export interface AnthropicSession {
 // name: "write", input: {...} }]). We type both so the renderer can
 // surface the tool name regardless of where it lives.
 export interface AnthropicEvent {
-  type: string;
-  created_at?: string;
   content?: Array<{
     type: string;
     text?: string;
@@ -466,7 +583,9 @@ export interface AnthropicEvent {
     is_error?: boolean;
     content?: unknown;
   }>;
-  name?: string;
-  input?: unknown;
+  created_at?: string;
   error?: { message?: string };
+  input?: unknown;
+  name?: string;
+  type: string;
 }

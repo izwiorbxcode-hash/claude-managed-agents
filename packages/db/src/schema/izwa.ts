@@ -211,6 +211,95 @@ export const izwaDatasetVersions = sqliteTable("izwa_dataset_versions", {
   version: text("version").notNull(),
 });
 
+export const izwaPassages = sqliteTable(
+  "izwa_passages",
+  {
+    annotationState: text("annotation_state").notNull().default("draft"),
+    assetId: text("asset_id").notNull(),
+    contextAfter: text("context_after"),
+    contextBefore: text("context_before"),
+    createdAtMs: integer("created_at_ms").notNull(),
+    currentRevisionId: text("current_revision_id"),
+    endMs: integer("end_ms").notNull(),
+    passageId: text("passage_id").primaryKey(),
+    paymentState: text("payment_state").notNull().default("unaccrued"),
+    permissionState: text("permission_state").notNull().default("pending"),
+    processingState: text("processing_state").notNull().default("ready"),
+    releaseState: text("release_state").notNull().default("unassigned"),
+    reviewState: text("review_state").notNull().default("unassigned"),
+    startMs: integer("start_ms").notNull(),
+    tenant: text("tenant").notNull().default("default"),
+    updatedAtMs: integer("updated_at_ms").notNull(),
+  },
+  (t) => [
+    index("idx_izwa_passages_asset").on(t.assetId, t.startMs),
+    index("idx_izwa_passages_review").on(
+      t.tenant,
+      t.reviewState,
+      t.updatedAtMs
+    ),
+  ]
+);
+
+export const izwaPassageRevisions = sqliteTable(
+  "izwa_passage_revisions",
+  {
+    contributorId: text("contributor_id"),
+    correctedTranscript: text("corrected_transcript"),
+    createdAtMs: integer("created_at_ms").notNull(),
+    culturalDetailJson: text("cultural_detail_json").notNull().default("{}"),
+    interpretationJson: text("interpretation_json").notNull().default("{}"),
+    languageJson: text("language_json").notNull().default("{}"),
+    machineTranscript: text("machine_transcript").notNull(),
+    meaningJson: text("meaning_json").notNull().default("{}"),
+    normalizedTranscript: text("normalized_transcript"),
+    passageId: text("passage_id").notNull(),
+    passageRevisionId: text("passage_revision_id").primaryKey(),
+    revisionNumber: integer("revision_number").notNull(),
+    revisionReason: text("revision_reason").notNull(),
+  },
+  (t) => [
+    index("idx_izwa_passage_revisions_passage").on(
+      t.passageId,
+      t.revisionNumber
+    ),
+  ]
+);
+
+export const izwaModelRuns = sqliteTable(
+  "izwa_model_runs",
+  {
+    attemptCount: integer("attempt_count").notNull().default(0),
+    completedAtMs: integer("completed_at_ms"),
+    createdAtMs: integer("created_at_ms").notNull(),
+    errorCode: text("error_code"),
+    errorDetail: text("error_detail"),
+    jobKey: text("job_key").notNull().unique(),
+    modelRunId: text("model_run_id").primaryKey(),
+    passageId: text("passage_id").notNull(),
+    passageRevisionId: text("passage_revision_id").notNull(),
+    probabilitiesJson: text("probabilities_json"),
+    proposedLabelsJson: text("proposed_labels_json"),
+    provider: text("provider").notNull(),
+    requestedModel: text("requested_model").notNull(),
+    requestJson: text("request_json"),
+    resolvedModel: text("resolved_model"),
+    responseJson: text("response_json"),
+    rubricVersion: text("rubric_version").notNull(),
+    startedAtMs: integer("started_at_ms"),
+    status: text("status").notNull().default("queued"),
+    task: text("task").notNull(),
+    usageJson: text("usage_json"),
+  },
+  (t) => [
+    index("idx_izwa_model_runs_revision").on(
+      t.passageRevisionId,
+      t.createdAtMs
+    ),
+    index("idx_izwa_model_runs_status").on(t.status, t.createdAtMs),
+  ]
+);
+
 export type IzwaAssetRow = typeof izwaAssets.$inferSelect;
 export type IzwaTaskRow = typeof izwaTasks.$inferSelect;
 export type IzwaRecordRow = typeof izwaRecords.$inferSelect;
